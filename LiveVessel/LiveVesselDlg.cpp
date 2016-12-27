@@ -17,7 +17,6 @@
 #include <time.h>
 
 #ifdef _DEBUG
-#define DEBUG_NEW new(__FILE__, __LINE__)
 #define new DEBUG_NEW
 #endif
 
@@ -3030,6 +3029,7 @@ void CLiveVesselDlg::OnDestroy()
 	//_CrtDumpMemoryLeaks();
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 }
+
 void CLiveVesselDlg::dispUpdate(bool bPaint)
 {
 	iLineSelected_state = CLEAR_LINE;
@@ -3174,6 +3174,7 @@ void CLiveVesselDlg::dispUpdate(bool bPaint)
 		OnPaint(); WriteLog(__FILE__, __LINE__, __FUNCTION__);
 
 }
+
 UINT CLiveVesselDlg::ThreadFunction(LPVOID _mothod)
 {
 	CLiveVesselDlg *pDlg = (CLiveVesselDlg*)_mothod;
@@ -3230,9 +3231,7 @@ UINT CLiveVesselDlg::ThreadFunction(LPVOID _mothod)
 
 		tmp_Segm.clear();
 	}
-
 	fclose(vscFile);
-
 
 
 	for (int i = cur_frame; i < end_frame; i++)
@@ -3250,13 +3249,14 @@ UINT CLiveVesselDlg::ThreadFunction(LPVOID _mothod)
 
 
 		std::vector<cv::Point> J, End;
-		std::vector<std::vector < cv::Point >> tp1_2d_vec_vescl = vco.get_adjust_VsegVpts2dArr_pp(&J, &End);
+		std::vector<std::vector < cv::Point >> tp1_2d_vec_vescl = 
+			vco.get_adjust_VsegVpts2dArr_pp(&J, &End);
 
 
 		//cv::Mat gaussKernel = cv::getGaussianKernel(23, 4.4f);
 		for (int j = 0; j < tp1_2d_vec_vescl.size(); j++)
 		{
-			MakeRegionMask_NKJ(tp1_2d_vec_vescl[j]);
+			pDlg->MakeRegionMask_NKJ(tp1_2d_vec_vescl[j]);
 			/*
 			cv::Mat convScale(1, tp1_2d_vec_vescl[j].size(), CV_64FC1);
 			for (int k = 0; k < tp1_2d_vec_vescl[j].size(); k++)

@@ -119,7 +119,8 @@ public:
 	// get displacement vector to subtract tp1 frame points to t frame points
 	std::vector<cv::Point> get_disp_vec_arr();
 	// draw displacement vector
-	cv::Mat drawDisplacementeVec(cv::Mat img, std::vector<cv::Point> pre, std::vector<cv::Point> post, std::vector<cv::Point> dispVec);
+	cv::Mat drawDisplacementeVec(cv::Mat img, std::vector<cv::Point> pre, std::vector<cv::Point> post, 
+		std::vector<cv::Point> dispVec);
 
 	// coded by khNoh (20160814)
 	// get information to linked each segmentation at after post processed t+1 frame
@@ -127,7 +128,8 @@ public:
 	std::vector<std::vector<std::vector<std::vector<int>>>> get_tp1_segm_linked_information();
 
 
-	std::vector<std::vector<cv::Point>> get_adjust_VsegVpts2dArr_pp(std::vector<cv::Point> *Junction = NULL, std::vector<cv::Point> *End = NULL);
+	std::vector<std::vector<cv::Point>> get_adjust_VsegVpts2dArr_pp(std::vector<cv::Point> *Junction = NULL, 
+		std::vector<cv::Point> *End = NULL);
 	// *** 
 
 	// *********** END FUNCTIONS RELATED TO VCO ALGORITHM *********** //

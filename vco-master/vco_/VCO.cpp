@@ -2722,7 +2722,8 @@ cv::Mat cVCO::get_tp1_adjusted_vescl_mask_pp()
 
 	return tp1_vmask_pp;
 }
-std::vector<std::vector<cv::Point>> cVCO::get_adjust_VsegVpts2dArr_pp(std::vector<cv::Point> *Junction, std::vector<cv::Point> *End)
+std::vector<std::vector<cv::Point>> cVCO::get_adjust_VsegVpts2dArr_pp(std::vector<cv::Point> *Junction, 
+	std::vector<cv::Point> *End)
 {
 	cv::Mat tp1_vescl_mask = get_tp1_adjusted_vescl_mask_pp();
 

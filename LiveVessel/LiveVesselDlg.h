@@ -240,6 +240,7 @@ public:
 	afx_msg void OnClose();
 
 	// ADDED: SCLEE 20161227
+public:
 	void MakeRegionMask_NKJ(std::vector<cv::Point> &vecPts);
 
 	// END: SCLEE 20161227
