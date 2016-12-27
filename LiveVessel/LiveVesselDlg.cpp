@@ -3515,7 +3515,11 @@ void CLiveVesselDlg::OnClose()
 }
 
 
-
+// generate vessel segmentation mask from vessel centerline points 
+// using Frangi max response scales
+// - by Kyoungjin Noh, 201610
+//   method: get max response scale at each vessel centerline point from Frangi filtering results,
+//			 draw filled circles at the corresponding point with radius scale
 void CLiveVesselDlg::MakeRegionMask_NKJ(std::vector<cv::Point> &vecPts)
 {
 	cv::Mat convScale(1, vecPts.size(), CV_64FC1);
@@ -3540,4 +3544,14 @@ void CLiveVesselDlg::MakeRegionMask_NKJ(std::vector<cv::Point> &vecPts)
 		cv::circle(m_mask, cv::Point(cur_x, cur_y), convScale.at<double>(0, k), 255, -1);
 	}
 	convScale.release();
+}
+
+// generate vessel segmentation mask from vessel centerline points 
+// using graph cuts
+// - by Soochahn Lee, 201612
+//   method: get max response scale at each vessel centerline point from Frangi filtering results,
+//			 draw filled circles at the corresponding point with radius scale
+void CLiveVesselDlg::MakeRegionMask_GraphCut(std::vector<cv::Point> &vecPts)
+{
+
 }
