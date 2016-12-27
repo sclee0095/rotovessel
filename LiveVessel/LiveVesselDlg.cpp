@@ -955,6 +955,8 @@ void CLiveVesselDlg::OnLButtonDown(UINT nFlags, CPoint point)
 			//vecPts.push_back(ptEnd);
 			SegmTree.addSegm(vecPts);
 
+			MakeRegionMask_NKJ(vecPts);
+			/*
 			cv::Mat convScale(1, vecPts.size(), CV_64FC1);
 			for (int k = 0; k < vecPts.size(); k++)
 			{
@@ -977,6 +979,8 @@ void CLiveVesselDlg::OnLButtonDown(UINT nFlags, CPoint point)
 				cv::circle(m_mask, cv::Point(cur_x, cur_y), convScale.at<double>(0, k), 255, -1);
 			}
 			convScale.release();
+			*/
+
 
 			//////////////////////////
 			//coded by kjNoh 160922 
@@ -1288,7 +1292,8 @@ BOOL CLiveVesselDlg::PreTranslateMessage(MSG* pMsg)
 					{
 						std::vector<cv::Point> vecPts;
 						vecPts = SegmTree.get(i);
-
+						MakeRegionMask_NKJ(vecPts);
+						/*
 						cv::Mat convScale(1, vecPts.size(), CV_64FC1);
 						for (int k = 0; k < vecPts.size(); k++)
 						{
@@ -1309,6 +1314,7 @@ BOOL CLiveVesselDlg::PreTranslateMessage(MSG* pMsg)
 							cv::circle(m_mask, cv::Point(cur_x, cur_y), convScale.at<double>(0, k), 255, -1);
 						}
 						convScale.release();
+						*/
 					}
 					//cv::imshow("mask_after_edit", m_mask);
 					//cv::waitKey();
@@ -1642,6 +1648,8 @@ void CLiveVesselDlg::OnLButtonUp(UINT nFlags, CPoint point)
 
 		SegmTree.addSegm(cur_path);
 
+		MakeRegionMask_NKJ(cur_path);
+		/*
 		cv::Mat convScale(1, cur_path.size(), CV_64FC1);
 		for (int k = 0; k < cur_path.size(); k++)
 		{
@@ -1664,6 +1672,7 @@ void CLiveVesselDlg::OnLButtonUp(UINT nFlags, CPoint point)
 			cv::circle(m_mask, cv::Point(cur_x, cur_y), convScale.at<double>(0, k), 255, -1);
 		}
 		convScale.release();
+		*/
 
 		//////////////////////////
 		//coded by kjNoh 160922 
@@ -2114,6 +2123,8 @@ void CLiveVesselDlg::OnBnClickedButtonVcoFrame()
 	//cv::Mat gaussKernel = cv::getGaussianKernel(23, 4.4f);
 	for (int j = 0; j < tp1_2d_vec_vescl.size(); j++)
 	{
+		MakeRegionMask_NKJ(tp1_2d_vec_vescl[j]);
+		/*
 		cv::Mat convScale(1, tp1_2d_vec_vescl[j].size(), CV_64FC1);
 		for (int k = 0; k < tp1_2d_vec_vescl[j].size(); k++)
 		{
@@ -2136,6 +2147,7 @@ void CLiveVesselDlg::OnBnClickedButtonVcoFrame()
 			cv::circle(m_mask, cv::Point(cur_x, cur_y), convScale.at<double>(0, k), 255, -1);
 		}
 		convScale.release();
+		*/
 	}
 
 	char maskSavePath[200];
@@ -2539,6 +2551,8 @@ void CLiveVesselDlg::OnBnClickedButtonVcoSequence()
 		//cv::Mat gaussKernel = cv::getGaussianKernel(23, 4.4f);
 		for (int j = 0; j < tp1_2d_vec_vescl.size(); j++)
 		{
+			MakeRegionMask_NKJ(tp1_2d_vec_vescl[j]);
+			/*
 			cv::Mat convScale(1, tp1_2d_vec_vescl[j].size(), CV_64FC1);
 			for (int k = 0; k < tp1_2d_vec_vescl[j].size(); k++)
 			{
@@ -2561,6 +2575,7 @@ void CLiveVesselDlg::OnBnClickedButtonVcoSequence()
 				cv::circle(m_mask, cv::Point(cur_x, cur_y), convScale.at<double>(0, k), 255, -1);
 			}
 			convScale.release();
+			*/
 		}
 
 		char maskSavePath[200];
@@ -3241,6 +3256,8 @@ UINT CLiveVesselDlg::ThreadFunction(LPVOID _mothod)
 		//cv::Mat gaussKernel = cv::getGaussianKernel(23, 4.4f);
 		for (int j = 0; j < tp1_2d_vec_vescl.size(); j++)
 		{
+			MakeRegionMask_NKJ(tp1_2d_vec_vescl[j]);
+			/*
 			cv::Mat convScale(1, tp1_2d_vec_vescl[j].size(), CV_64FC1);
 			for (int k = 0; k < tp1_2d_vec_vescl[j].size(); k++)
 			{
@@ -3263,6 +3280,7 @@ UINT CLiveVesselDlg::ThreadFunction(LPVOID _mothod)
 				cv::circle(pDlg->m_mask, cv::Point(cur_x, cur_y), convScale.at<double>(0, k), 255, -1);
 			}
 			convScale.release();
+			*/
 		}
 
 
@@ -3494,4 +3512,32 @@ void CLiveVesselDlg::OnClose()
 	CloseLogStream();
 
 	CDialogEx::OnClose();
+}
+
+
+
+void CLiveVesselDlg::MakeRegionMask_NKJ(std::vector<cv::Point> &vecPts)
+{
+	cv::Mat convScale(1, vecPts.size(), CV_64FC1);
+	for (int k = 0; k < vecPts.size(); k++)
+	{
+		int cur_x = vecPts[k].x;
+		int cur_y = vecPts[k].y;
+		double s = FrangiScale.at<double>(cur_y, cur_x);
+
+		convScale.at<double>(0, k) = s;
+	}
+
+	cv::GaussianBlur(convScale, convScale, cv::Size(23, 1), 4.4f);
+
+	for (int k = 0; k < vecPts.size(); k++)
+	{
+		int cur_x = vecPts[k].x;
+		int cur_y = vecPts[k].y;
+		//test.at<uchar>(cur_y,cur_x*3+0)
+		//double s = FrangiScale[i + 1].at<double>(cur_y, cur_x);
+
+		cv::circle(m_mask, cv::Point(cur_x, cur_y), convScale.at<double>(0, k), 255, -1);
+	}
+	convScale.release();
 }

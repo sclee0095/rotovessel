@@ -238,4 +238,9 @@ public:
 	std::vector<cv::Point> getLine(cv::Point sp, cv::Point ep);
 	CStatic m_ctrl_FileName;	
 	afx_msg void OnClose();
+
+	// ADDED: SCLEE 20161227
+	void MakeRegionMask_NKJ(std::vector<cv::Point> &vecPts);
+
+	// END: SCLEE 20161227
 };
