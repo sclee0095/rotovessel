@@ -1,0 +1,41 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.31101.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LiveVessel", "LiveVessel\LiveVessel.vcxproj", "{146EC32D-114E-4CDC-B640-37F756ED2981}"
+	ProjectSection(ProjectDependencies) = postProject
+		{FBF6AE53-7F7B-4520-8879-FBE13051CDC9} = {FBF6AE53-7F7B-4520-8879-FBE13051CDC9}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "vco_", "vco-master\vco_\vco_.vcxproj", "{FBF6AE53-7F7B-4520-8879-FBE13051CDC9}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Debug|x64 = Debug|x64
+		Release|Win32 = Release|Win32
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{146EC32D-114E-4CDC-B640-37F756ED2981}.Debug|Win32.ActiveCfg = Debug|Win32
+		{146EC32D-114E-4CDC-B640-37F756ED2981}.Debug|Win32.Build.0 = Debug|Win32
+		{146EC32D-114E-4CDC-B640-37F756ED2981}.Debug|x64.ActiveCfg = Debug|x64
+		{146EC32D-114E-4CDC-B640-37F756ED2981}.Debug|x64.Build.0 = Debug|x64
+		{146EC32D-114E-4CDC-B640-37F756ED2981}.Release|Win32.ActiveCfg = Release|Win32
+		{146EC32D-114E-4CDC-B640-37F756ED2981}.Release|Win32.Build.0 = Release|Win32
+		{146EC32D-114E-4CDC-B640-37F756ED2981}.Release|x64.ActiveCfg = Release|x64
+		{146EC32D-114E-4CDC-B640-37F756ED2981}.Release|x64.Build.0 = Release|x64
+		{FBF6AE53-7F7B-4520-8879-FBE13051CDC9}.Debug|Win32.ActiveCfg = Debug|Win32
+		{FBF6AE53-7F7B-4520-8879-FBE13051CDC9}.Debug|Win32.Build.0 = Debug|Win32
+		{FBF6AE53-7F7B-4520-8879-FBE13051CDC9}.Debug|x64.ActiveCfg = Debug|x64
+		{FBF6AE53-7F7B-4520-8879-FBE13051CDC9}.Debug|x64.Build.0 = Debug|x64
+		{FBF6AE53-7F7B-4520-8879-FBE13051CDC9}.Release|Win32.ActiveCfg = Release|Win32
+		{FBF6AE53-7F7B-4520-8879-FBE13051CDC9}.Release|Win32.Build.0 = Release|Win32
+		{FBF6AE53-7F7B-4520-8879-FBE13051CDC9}.Release|x64.ActiveCfg = Release|x64
+		{FBF6AE53-7F7B-4520-8879-FBE13051CDC9}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
