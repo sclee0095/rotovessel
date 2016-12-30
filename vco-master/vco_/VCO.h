@@ -392,3 +392,17 @@ private:
 	// ***** END OF INTERNAL FUNCTIONS ***** //
 };
 
+// ADDED: SCLEE 20161227
+void VCO_EXPORTS grabCut_mod(cv::InputArray _img, cv::InputOutputArray _mask, cv::Rect rect,
+	cv::InputOutputArray _bgdModel, cv::InputOutputArray _fgdModel,
+	int iterCount, int mode, int nGMMcc=3, double lambda=50, double u_max=450);
+
+void VCO_EXPORTS MakeRegionMask_NKJ(
+	std::vector<cv::Point> &vecPts,
+	cv::Mat &frangiScale,
+	cv::Mat &mask, cv::Scalar col = cv::Scalar(255));
+cv::Mat VCO_EXPORTS MakeRegionMask_GraphCut(
+	std::vector<cv::Point> &vecPts,
+	cv::Mat &frangiScale,
+	cv::Mat &img, cv::Mat &mask);
+// END: SCLEE 20161227

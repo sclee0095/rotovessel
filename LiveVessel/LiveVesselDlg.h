@@ -162,7 +162,7 @@ public:
 	int iLineIndex;
 	int iLineSelected_state;
 	afx_msg void OnBnClickedButtonVcoFrame();
-	afx_msg void OnBnClickedButtonFinish();
+	afx_msg void FinishAndSave2File();
 
 	//std::vector<CString> m_fileName;
 	WCHAR m_pszPathName[2000];
@@ -239,9 +239,14 @@ public:
 	CStatic m_ctrl_FileName;	
 	afx_msg void OnClose();
 
-	// ADDED: SCLEE 20161227
-public:
-	void MakeRegionMask_NKJ(std::vector<cv::Point> &vecPts);
-	void MakeRegionMask_GraphCut(std::vector<cv::Point> &vecPts);
-	// END: SCLEE 20161227
+	//2016.12.21_daseul _UNDO&REDO
+	std::vector<std::vector<cv::Point> > m_tmpLine;
+	//int iDraw_path_sliderPos;
+	void ReDrawMask();
+
+
+	// 2016.12.29 SCLEE - CLEAN CODE
+	void SaveVesCenterlineMask2File(int cur_frame);
+	void SaveVesCenterlineCoord2File(int cur_frame);
+	void SaveVesSegmentationMask2File(int cur_frame);
 };

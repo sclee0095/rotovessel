@@ -129,7 +129,7 @@ BEGIN_MESSAGE_MAP(CLiveVesselDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_RADIO_MOVE, &CLiveVesselDlg::OnBnClickedRadioMove)
 	ON_WM_SETCURSOR()
 	ON_BN_CLICKED(IDC_BUTTON_VCO_FRAME, &CLiveVesselDlg::OnBnClickedButtonVcoFrame)
-	ON_BN_CLICKED(IDC_BUTTON_FINISH, &CLiveVesselDlg::OnBnClickedButtonFinish)
+	//ON_BN_CLICKED(IDC_BUTTON_FINISH, &CLiveVesselDlg::FinishAndSave2File)
 	ON_BN_CLICKED(IDC_BUTTON_VCO_SEQUENCE, &CLiveVesselDlg::OnBnClickedButtonVcoSequence)
 	ON_WM_LBUTTONDBLCLK()
 	ON_WM_RBUTTONDOWN()
@@ -142,6 +142,8 @@ BEGIN_MESSAGE_MAP(CLiveVesselDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_CHECK_MANUAL_EDIT, &CLiveVesselDlg::OnBnClickedCheckManualEdit)
 	ON_WM_CLOSE()
 END_MESSAGE_MAP()
+
+int CALLBACK BrowseCallback(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData);
 
 
 // CLiveVesselDlg 메시지 처리기
@@ -329,9 +331,13 @@ void CLiveVesselDlg::OnPaint()
 							//int B = vesselImg.at<uchar>(pt_y, pt_x * 3 + 0);
 							//cv::circle(disp, cv::Point(pt_x, pt_y), FrangiScale.at<double>(pt_y, pt_x), CV_RGB(R, G, B), -1);
 
-							disp.at<uchar>(pt_y, pt_x * 3 + 0) = 255;
-							disp.at<uchar>(pt_y, pt_x * 3 + 1) = 0;
-							disp.at<uchar>(pt_y, pt_x * 3 + 2) = 0;
+							//2016.12.27_daseul
+							if ((pt_x < disp.cols) && (pt_y < disp.rows))
+							{
+								disp.at<uchar>(pt_y, pt_x * 3 + 0) = 255;
+								disp.at<uchar>(pt_y, pt_x * 3 + 1) = 0;
+								disp.at<uchar>(pt_y, pt_x * 3 + 2) = 0;
+							}
 						}
 					}
 
@@ -373,9 +379,13 @@ void CLiveVesselDlg::OnPaint()
 								//int B = vesselImg.at<uchar>(pt_y, pt_x * 3 + 0);
 								//cv::circle(disp, cv::Point(pt_x, pt_y), FrangiScale.at<double>(pt_y, pt_x), CV_RGB(R, G, B), -1);
 
-								disp.at<uchar>(pt_y, pt_x * 3 + 0) = 255;
-								disp.at<uchar>(pt_y, pt_x * 3 + 1) = 0;
-								disp.at<uchar>(pt_y, pt_x * 3 + 2) = 0;
+								//2016.12.27_dasuel
+								if ((pt_x < disp.cols) && (pt_y < disp.rows))
+								{
+									disp.at<uchar>(pt_y, pt_x * 3 + 0) = 255;
+									disp.at<uchar>(pt_y, pt_x * 3 + 1) = 0;
+									disp.at<uchar>(pt_y, pt_x * 3 + 2) = 0;
+								}
 							}
 						}
 
@@ -574,6 +584,9 @@ void CLiveVesselDlg::OnBnClickedButtonImageLoad()
 		m_vecPtZoom.clear();
 		cur_path.clear();
 
+	//2016.12.22_daseul
+		m_tmpLine.clear();
+
 		tStart = clock();
 	}
 	else
@@ -766,10 +779,10 @@ void CLiveVesselDlg::OnBnClickedButtonImageLoad()
 
 	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnBnClickedButtonImageLoad()");
 
-	//CString fname;
-	//fname.Format("%s",);
-	//
-	//m_ctrl_FileName.SetWindowTextW(fname);
+	// show sequence directory name above viewing window
+	CString fname;
+	fname.Format(L"adsfadhgasdhg");
+	m_ctrl_FileName.SetWindowText(fname);
 }
 
 
@@ -954,7 +967,7 @@ void CLiveVesselDlg::OnLButtonDown(UINT nFlags, CPoint point)
 			//vecPts.push_back(ptEnd);
 			SegmTree.addSegm(vecPts);
 
-			MakeRegionMask_NKJ(vecPts);
+			MakeRegionMask_NKJ(vecPts, FrangiScale, m_mask);
 			/*
 			cv::Mat convScale(1, vecPts.size(), CV_64FC1);
 			for (int k = 0; k < vecPts.size(); k++)
@@ -1030,6 +1043,9 @@ void CLiveVesselDlg::OnLButtonDown(UINT nFlags, CPoint point)
 			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnLButtonDown()");
 
 		}
+
+		//2016.12.22_daseul
+		FinishAndSave2File();
 	}
 
 	if (m_bZoom)
@@ -1102,11 +1118,13 @@ void CLiveVesselDlg::OnLButtonDown(UINT nFlags, CPoint point)
 
 void CLiveVesselDlg::OnBnClickedButtonLeftSlide()
 {
-	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 	iSliderPos -= 1;
 
 	if (iSliderPos < 0)
 		iSliderPos = 0;
+
+	//2016.12.22_daseul
+	m_tmpLine.clear();
 
 	////vesselImg[iSliderPos].copyTo(vesselImg);
 	//vesselImg = vesselImg[iSliderPos];
@@ -1120,6 +1138,8 @@ void CLiveVesselDlg::OnBnClickedButtonLeftSlide()
 
 	dispUpdate();
 	updateSegm();
+
+	UpdateData();
 }
 
 
@@ -1130,6 +1150,9 @@ void CLiveVesselDlg::OnBnClickedButtonRightSlide()
 	if (iSliderPos > vecFname.size() - 1)
 		iSliderPos = vecFname.size() - 1;
 
+	//2016.12.22_daseul
+	m_tmpLine.clear();
+
 	////vesselImg[iSliderPos].copyTo(vesselImg);
 	//vesselImg = vesselImg[iSliderPos];
 	//frangiImg = frangiImg[iSliderPos];
@@ -1142,6 +1165,8 @@ void CLiveVesselDlg::OnBnClickedButtonRightSlide()
 
 	dispUpdate();
 	updateSegm();
+	
+	UpdateData();
 }
 
 
@@ -1158,6 +1183,52 @@ BOOL CLiveVesselDlg::PreTranslateMessage(MSG* pMsg)
 		WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::PreTranslateMessage()");
 		if (!bWorking)
 		{
+			//2016.12.21_daseul _UNDO
+			if ((GetKeyState(VK_CONTROL) & 0x8000) && pMsg->wParam == 'Z')
+			{
+				//Store the last path of SegmTree to m_tmpLine and Remove the last path of SegmTree
+				if (SegmTree.nSegm != 0)
+				{
+					m_tmpLine.push_back(SegmTree.get(SegmTree.nSegm - 1));
+					SegmTree.rmSegm(SegmTree.nSegm - 1);
+				}
+				//initialize selected line
+				iLineSelected_state = CLEAR_LINE;
+				//iLineIndex = -1;
+
+				//re-draw vessel mask
+				ReDrawMask();
+				iLineIndex = -1;
+			}
+
+			//2016.12.21_daseul _REDO
+			else if ((GetKeyState(VK_SHIFT) & 0x8000) && pMsg->wParam == 'Z')
+			{
+				if (!m_tmpLine.empty())
+				{
+					//Add the last line of m_tmpLine to SegmTree and Remove the last line of m_tmpLine
+					SegmTree.addSegm(m_tmpLine.back());
+					//m_tmpLine.pop_back();
+
+					//2016.12.27_daseul _add feature point
+					featureInfo cur_feat;
+					cur_feat.sp = m_tmpLine.back().front();
+					cur_feat.spType = 0;
+					cur_feat.ep = m_tmpLine.back().back();
+					cur_feat.epType = 0;
+
+					featureTree.addFeat(cur_feat);
+
+					m_tmpLine.pop_back();
+				}
+
+				//initialize selected line
+				iLineSelected_state = CLEAR_LINE;
+				iLineIndex = -1;
+
+				//re-draw vessel mask
+				ReDrawMask();
+			}
 
 			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::PreTranslateMessage()");
 			bWorking = true;
@@ -1168,6 +1239,9 @@ BOOL CLiveVesselDlg::PreTranslateMessage(MSG* pMsg)
 
 				if (iSliderPos < 0)
 					iSliderPos = 0;
+
+				//2016.12.22_daseul
+				m_tmpLine.clear();
 
 				////vesselImg[iSliderPos].copyTo(vesselImg);
 				//vesselImg = vesselImg[iSliderPos];
@@ -1193,6 +1267,9 @@ BOOL CLiveVesselDlg::PreTranslateMessage(MSG* pMsg)
 				iSliderPos += 1;
 				if (iSliderPos > vecFname.size() - 1)
 					iSliderPos = vecFname.size() - 1;
+
+				//2016.12.22_daseul
+				m_tmpLine.clear();
 
 				////vesselImg[iSliderPos].copyTo(vesselImg);
 				//vesselImg = vesselImg[iSliderPos];
@@ -1272,27 +1349,33 @@ BOOL CLiveVesselDlg::PreTranslateMessage(MSG* pMsg)
 				break;
 
 			case 'Z':
-				if (m_bLoad != 0 && iLineIndex != -1)
+				if (!(GetKeyState(VK_SHIFT) & 0x8000) && !(GetKeyState(VK_CONTROL) & 0x8000))
 				{
-					//CSegmTree &curSegTree = SegmTree;
-					SegmTree.rmSegm(iLineIndex);
-					//SegmTree.rmSegm(iLineIndex);
-					//(*SegmTree).erase((*SegmTree).begin() + iLineIndex);
+					if (m_bLoad != 0 && iLineIndex != -1)
+					{
+						//CSegmTree &curSegTree = SegmTree;
+						//2016.12.22_daseul
+						if (SegmTree.nSegm != 0)
+						{
+							m_tmpLine.push_back(SegmTree.get(iLineIndex));
+							SegmTree.rmSegm(iLineIndex);
+						}
+						//SegmTree.rmSegm(iLineIndex);
+						//SegmTree.rmSegm(iLineIndex);
+						//(*SegmTree).erase((*SegmTree).begin() + iLineIndex);
 
-					iLineSelected_state = CLEAR_LINE;
+						iLineSelected_state = CLEAR_LINE;
 
 					//////////////////////////////////////////161007 daseul
 
 
 					//cv::imshow("mask_before_edit", m_mask);
 					//cv::waitKey();
-					m_mask = 0;
+					/*m_mask = 0;
 					for (int i = 0; i < SegmTree.nSegm; i++)
 					{
 						std::vector<cv::Point> vecPts;
 						vecPts = SegmTree.get(i);
-						MakeRegionMask_NKJ(vecPts);
-						/*
 						cv::Mat convScale(1, vecPts.size(), CV_64FC1);
 						for (int k = 0; k < vecPts.size(); k++)
 						{
@@ -1313,21 +1396,28 @@ BOOL CLiveVesselDlg::PreTranslateMessage(MSG* pMsg)
 							cv::circle(m_mask, cv::Point(cur_x, cur_y), convScale.at<double>(0, k), 255, -1);
 						}
 						convScale.release();
-						*/
 					}
-					//cv::imshow("mask_after_edit", m_mask);
+					*/
+						//cv::imshow("mask_after_edit", m_mask);
 					//cv::waitKey();
 					////////////////////////////////////////
 
 
-					//////////////////////////////////
-					// coded by kjNoh 160922
-					updateSegm();
-					iLineIndex = -1;
-					//dispUpdate();
-					////////////////////////////////////
+						//////////////////////////////////
+						// coded by kjNoh 160922
+						//2016.12.22_daseul _modified code : code->function(ReDrawMask())
+						//updateSegm();
+						//iLineIndex = -1;
+						//dispUpdate();
+						////////////////////////////////////
 
-					OnPaint();
+						//OnPaint();
+
+						//2016.12.22_daseul
+						ReDrawMask();
+						iLineIndex = -1;
+						FinishAndSave2File();
+					}
 				}
 				break;
 
@@ -1647,7 +1737,7 @@ void CLiveVesselDlg::OnLButtonUp(UINT nFlags, CPoint point)
 
 		SegmTree.addSegm(cur_path);
 
-		MakeRegionMask_NKJ(cur_path);
+		MakeRegionMask_NKJ(cur_path, FrangiScale, m_mask);
 		/*
 		cv::Mat convScale(1, cur_path.size(), CV_64FC1);
 		for (int k = 0; k < cur_path.size(); k++)
@@ -2047,6 +2137,9 @@ void CLiveVesselDlg::OnBnClickedButtonVcoFrame()
 	if (!m_bLoad)
 		return;
 
+	//2016.12.22_daseul
+	m_tmpLine.clear();
+
 	int nY = vesselImg.rows;
 	int nX = vesselImg.cols;
 	int cur_frame = iSliderPos;
@@ -2122,7 +2215,9 @@ void CLiveVesselDlg::OnBnClickedButtonVcoFrame()
 	//cv::Mat gaussKernel = cv::getGaussianKernel(23, 4.4f);
 	for (int j = 0; j < tp1_2d_vec_vescl.size(); j++)
 	{
-		MakeRegionMask_NKJ(tp1_2d_vec_vescl[j]);
+		//cv::Mat vimgtp1 = cv::imread(vecFname[cur_frame + 1]);
+		MakeRegionMask_GraphCut(tp1_2d_vec_vescl[j], FrangiScale, d_tp1VesselImg, m_mask);
+		//MakeRegionMask_NKJ(tp1_2d_vec_vescl[j]);
 		/*
 		cv::Mat convScale(1, tp1_2d_vec_vescl[j].size(), CV_64FC1);
 		for (int k = 0; k < tp1_2d_vec_vescl[j].size(); k++)
@@ -2316,14 +2411,9 @@ void CLiveVesselDlg::OnBnClickedButtonVcoFrame()
 
 }
 
-
-void CLiveVesselDlg::OnBnClickedButtonFinish()
+// save vessel centerline mask to file
+void CLiveVesselDlg::SaveVesCenterlineMask2File(int cur_frame)
 {
-	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
-
-	if (SegmTree.nSegm == 0)
-		return;
-
 	cv::Mat result_frame(m_height, m_width, CV_8UC1);
 	result_frame = 0;
 
@@ -2332,7 +2422,7 @@ void CLiveVesselDlg::OnBnClickedButtonFinish()
 		std::vector<cv::Point> tmp_Segm = SegmTree.get(i);
 		for (int j = 0; j < tmp_Segm.size(); j++)
 		{
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnBnClickedButtonFinish()");
+			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::FinishAndSave2File()");
 			int x, y;
 			x = tmp_Segm[j].x;
 			y = tmp_Segm[j].y;
@@ -2340,57 +2430,28 @@ void CLiveVesselDlg::OnBnClickedButtonFinish()
 			result_frame.at<uchar>(y, x) = 255;
 		}
 	}
-
-	/*cv::String str;
-	CString aa = L"\\";
-	CString root_path = L"S1";
-	str = m_pszPathName + aa + m_fileName[iSliderPos] + ".png";*/
-	int cur_frame = iSliderPos;
 	std::string str = vecFname[cur_frame];
-	str.pop_back(); str.pop_back(); str.pop_back(); str.pop_back();
+	str.erase(str.length() - 4, 4);
+	//str.pop_back(); str.pop_back(); str.pop_back(); str.pop_back();
 	str += "_vsc_mask";
 	str += ".png";
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnBnClickedButtonFinish()");
+	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::FinishAndSave2File()");
 	cv::imwrite(str, result_frame);
-
+}
+// save vessel centerline coordinates to file
+void CLiveVesselDlg::SaveVesCenterlineCoord2File(int cur_frame)
+{
 	FILE *vscFile;
-	str = vecFname[cur_frame];
-	str.pop_back(); str.pop_back(); str.pop_back();
+	std::string str = vecFname[cur_frame];
+	//str.pop_back(); str.pop_back(); str.pop_back();
+	str.erase(str.length() - 3, 3);
 	str += "vsc";
 	vscFile = fopen(str.data(), "wb");
 
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnBnClickedButtonFinish()");
+	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::FinishAndSave2File()");
 	if (!vscFile)
 		return;
 
-	/*char buffer[1024];
-	sprintf(buffer, "%d\r\n", (*SegmTree).size());
-	fwrite(buffer, strlen(buffer), 1, vscFile);
-	for (int i = 0; i < (*SegmTree).size(); i++)
-	{
-	char buffer1[1024];
-	sprintf(buffer1, "%d %d ", i, (*SegmTree)[i].size());
-	fwrite(buffer1, strlen(buffer1), 1, vscFile);
-	for (int j = 0; j < (*SegmTree)[i].size(); j++)
-	{
-	char buffer2[1024];
-	float x, y;
-	x = (*SegmTree)[i][j].x;
-	y = (*SegmTree)[i][j].y;
-
-	sprintf(buffer2, "%f %f ", x, y);
-	fwrite(buffer2, strlen(buffer2), 1, vscFile);
-	}
-	char buffer3[1024];
-	sprintf(buffer3, "\r\n\r\n");
-	fwrite(buffer3, strlen(buffer3), 1, vscFile);
-	}
-	fclose(vscFile);*/
-
-	// aa = L"\\";
-
-	//FILE *vscFile;
-	//vscFile = fopen(m_pszPathName + aa + m_fileName[iSliderPos] + ".vsc", "wb+");
 	int nCurFrmaeSegm = (int)SegmTree.nSegm;
 	fwrite(&nCurFrmaeSegm, sizeof(int), 1, vscFile);
 
@@ -2399,11 +2460,11 @@ void CLiveVesselDlg::OnBnClickedButtonFinish()
 		std::vector<cv::Point> tmp_Segm = SegmTree.get(j);
 		int nCurFrmaeSegmPt = (int)tmp_Segm.size();
 		fwrite(&nCurFrmaeSegmPt, sizeof(int), 1, vscFile);
-		WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnBnClickedButtonFinish()");
+		WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::FinishAndSave2File()");
 
 		for (int k = 0; k < nCurFrmaeSegmPt; k++)
 		{
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnBnClickedButtonFinish()");
+			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::FinishAndSave2File()");
 			int x = tmp_Segm[k].x;
 			int y = tmp_Segm[k].y;
 			fwrite(&x, sizeof(int), 1, vscFile);
@@ -2417,42 +2478,37 @@ void CLiveVesselDlg::OnBnClickedButtonFinish()
 		fwrite(&spepInfo.epType, sizeof(int), 1, vscFile);
 	}
 	fclose(vscFile);
-
+}
+// save vessel segmenation mask to file
+void CLiveVesselDlg::SaveVesSegmentationMask2File(int cur_frame)
+{
 	std::string maskPath = vecFname[cur_frame];
-	maskPath.pop_back(); maskPath.pop_back(); maskPath.pop_back(); maskPath.pop_back();
+	//maskPath.pop_back(); maskPath.pop_back(); maskPath.pop_back(); maskPath.pop_back();
+	maskPath.erase(maskPath.length() - 4, 4);
 	maskPath += "_mask.png";
 
 	cv::imwrite(maskPath, m_mask);
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnBnClickedButtonFinish()");
-	//FILE *fScale;
-	//std::string ffPath = vecFname[cur_frame];
-	//ffPath.pop_back(); ffPath.pop_back(); ffPath.pop_back();
-	//ffPath += "pre";
-	//int check = _access(ffPath.data(), 0);
+}
 
-	//if (!check)
-	//{
-	//	double *ffData = new double[vesselImg.rows*vesselImg.cols];
-	//	double *ffSacleData = new double[vesselImg.rows*vesselImg.cols];
-	//	fScale = fopen(ffPath.data(), "rb");
-	//	fread(ffData, sizeof(double), vesselImg.rows*vesselImg.cols, fScale);
-	//	fread(ffSacleData, sizeof(double), vesselImg.rows*vesselImg.cols, fScale);
-	//	cv::Mat tmp = cv::Mat(vesselImg.size(), CV_64FC1, ffSacleData);
-	//	tmp.copyTo(FrangiScale);
-	//	/*FrangiScale.convertTo(FrangiScale, CV_8UC1);
-	//	cv::imshow("FrangiScale", FrangiScale);
-	//	cv::waitKey();*/
-	//	delete[] ffData;
-	//	delete[] ffSacleData;
-	//	fclose(fScale);
-	//}
+// save current frame results
+void CLiveVesselDlg::FinishAndSave2File()
+{
+	// if there is no vessel segments in vessel tree (= no vessels extracted), do nothing
+	if (SegmTree.nSegm == 0)
+		return;
+
+	// save vessel centerline mask to file
+	SaveVesCenterlineMask2File(iSliderPos);
+	// save vessel centerline coordinates to file
+	SaveVesCenterlineCoord2File(iSliderPos);
+	// save vessel segmenation mask to file
+	SaveVesSegmentationMask2File(iSliderPos);
+	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::FinishAndSave2File()");
 }
 
 
 void CLiveVesselDlg::OnBnClickedButtonVcoSequence()
 {
-	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
-
 	if (!m_bLoad)
 		return;
 
@@ -2550,7 +2606,8 @@ void CLiveVesselDlg::OnBnClickedButtonVcoSequence()
 		//cv::Mat gaussKernel = cv::getGaussianKernel(23, 4.4f);
 		for (int j = 0; j < tp1_2d_vec_vescl.size(); j++)
 		{
-			MakeRegionMask_NKJ(tp1_2d_vec_vescl[j]);
+			MakeRegionMask_NKJ(tp1_2d_vec_vescl[j], FrangiScale, m_mask);
+
 			/*
 			cv::Mat convScale(1, tp1_2d_vec_vescl[j].size(), CV_64FC1);
 			for (int k = 0; k < tp1_2d_vec_vescl[j].size(); k++)
@@ -2582,7 +2639,6 @@ void CLiveVesselDlg::OnBnClickedButtonVcoSequence()
 		cvtFname.pop_back(); cvtFname.pop_back(); cvtFname.pop_back(); cvtFname.pop_back();
 		sprintf(maskSavePath, "%s_mask.png", cvtFname.data());
 		cv::imwrite(maskSavePath, m_mask);
-
 
 		cv::String str;
 
@@ -3021,13 +3077,10 @@ void CLiveVesselDlg::OnDestroy()
 	vecSpEpLists_Zoom.clear();
 	m_vecPtZoom.clear();
 
-	cv::Mat* vecMask;
 	//m_fileName.clear();
 	vecFname.clear();
 
-
 	//_CrtDumpMemoryLeaks();
-	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 }
 
 void CLiveVesselDlg::dispUpdate(bool bPaint)
@@ -3256,7 +3309,7 @@ UINT CLiveVesselDlg::ThreadFunction(LPVOID _mothod)
 		//cv::Mat gaussKernel = cv::getGaussianKernel(23, 4.4f);
 		for (int j = 0; j < tp1_2d_vec_vescl.size(); j++)
 		{
-			pDlg->MakeRegionMask_NKJ(tp1_2d_vec_vescl[j]);
+			MakeRegionMask_NKJ(tp1_2d_vec_vescl[j], pDlg->FrangiScale, pDlg->m_mask);
 			/*
 			cv::Mat convScale(1, tp1_2d_vec_vescl[j].size(), CV_64FC1);
 			for (int k = 0; k < tp1_2d_vec_vescl[j].size(); k++)
@@ -3415,9 +3468,7 @@ void CLiveVesselDlg::OnBnClickedButtonThreadPause()
 		iLineSelected_state = CLEAR_LINE;
 		iFeatSelected_state = CLEAR_FEATURE;
 
-
 		updateSegm();
-
 
 		dispUpdate();
 	}
@@ -3515,43 +3566,55 @@ void CLiveVesselDlg::OnClose()
 }
 
 
-// generate vessel segmentation mask from vessel centerline points 
-// using Frangi max response scales
-// - by Kyoungjin Noh, 201610
-//   method: get max response scale at each vessel centerline point from Frangi filtering results,
-//			 draw filled circles at the corresponding point with radius scale
-void CLiveVesselDlg::MakeRegionMask_NKJ(std::vector<cv::Point> &vecPts)
+
+int CALLBACK BrowseCallback(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData)
 {
-	cv::Mat convScale(1, vecPts.size(), CV_64FC1);
-	for (int k = 0; k < vecPts.size(); k++)
+	CHAR lpszDir[255];
+	switch (uMsg)
 	{
-		int cur_x = vecPts[k].x;
-		int cur_y = vecPts[k].y;
-		double s = FrangiScale.at<double>(cur_y, cur_x);
-
-		convScale.at<double>(0, k) = s;
+	case BFFM_INITIALIZED:
+		SendMessage(hwnd, BFFM_SETSELECTION, TRUE, lpData);
+		break;
+	case BFFM_SELCHANGED:
+		if (SHGetPathFromIDList((LPITEMIDLIST)lParam, (LPWSTR)lpszDir))
+			SendMessage(hwnd, BFFM_SETSTATUSTEXT, 0, (LPARAM)lpszDir);
+		break;
 	}
-
-	cv::GaussianBlur(convScale, convScale, cv::Size(23, 1), 4.4f);
-
-	for (int k = 0; k < vecPts.size(); k++)
-	{
-		int cur_x = vecPts[k].x;
-		int cur_y = vecPts[k].y;
-		//test.at<uchar>(cur_y,cur_x*3+0)
-		//double s = FrangiScale[i + 1].at<double>(cur_y, cur_x);
-
-		cv::circle(m_mask, cv::Point(cur_x, cur_y), convScale.at<double>(0, k), 255, -1);
-	}
-	convScale.release();
+	return 0;
 }
 
-// generate vessel segmentation mask from vessel centerline points 
-// using graph cuts
-// - by Soochahn Lee, 201612
-//   method: get max response scale at each vessel centerline point from Frangi filtering results,
-//			 draw filled circles at the corresponding point with radius scale
-void CLiveVesselDlg::MakeRegionMask_GraphCut(std::vector<cv::Point> &vecPts)
+void CLiveVesselDlg::ReDrawMask()
 {
+	m_mask = 0;
+	for (int i = 0; i < SegmTree.nSegm; i++)
+	{
+		std::vector<cv::Point> vecPts;
+		vecPts = SegmTree.get(i);
+		MakeRegionMask_NKJ(vecPts, FrangiScale, m_mask);
 
+		/*
+		cv::Mat convScale(1, vecPts.size(), CV_64FC1);
+		for (int k = 0; k < vecPts.size(); k++)
+		{
+			int cur_x = vecPts[k].x;
+			int cur_y = vecPts[k].y;
+			double s = FrangiScale.at<double>(cur_y, cur_x);
+
+			convScale.at<double>(0, k) = s;
+		}
+
+		cv::GaussianBlur(convScale, convScale, cv::Size(23, 1), 4.4f);
+
+		for (int k = 0; k < vecPts.size(); k++)
+		{
+			int cur_x = vecPts[k].x;
+			int cur_y = vecPts[k].y;
+
+			cv::circle(m_mask, cv::Point(cur_x, cur_y), convScale.at<double>(0, k), 255, -1);
+		}
+		convScale.release();
+		*/
+	}
+	updateSegm();
+	OnPaint();
 }
