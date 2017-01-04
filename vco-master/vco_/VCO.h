@@ -395,7 +395,7 @@ private:
 // ADDED: SCLEE 20161227
 void VCO_EXPORTS grabCut_mod(cv::InputArray _img, cv::InputOutputArray _mask, cv::Rect rect,
 	cv::InputOutputArray _bgdModel, cv::InputOutputArray _fgdModel,
-	int iterCount, int mode, int nGMMcc=3, double lambda=50, double u_max=450);
+	int iterCount, int mode, int nGMMcc=3, double lambda=100, double u_max=1000);
 
 void VCO_EXPORTS MakeRegionMask_NKJ(
 	std::vector<cv::Point> &vecPts,
@@ -404,5 +404,6 @@ void VCO_EXPORTS MakeRegionMask_NKJ(
 cv::Mat VCO_EXPORTS MakeRegionMask_GraphCut(
 	std::vector<cv::Point> &vecPts,
 	cv::Mat &frangiScale,
-	cv::Mat &img, cv::Mat &mask);
+	cv::Mat &img, cv::Mat &mask,
+	bool bPR_BGD_is_NarrowBand = true, int bgd_nb_sz = 10, int fgd_nb_sz = 2);
 // END: SCLEE 20161227

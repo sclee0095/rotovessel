@@ -500,8 +500,8 @@ static void constructGCGraph(const cv::Mat& img, const cv::Mat& mask,
 			}
 		}
 	}
-	cv::imwrite("unary_bg.png", unary_bg * 50);
-	cv::imwrite("unary_fg.png", unary_fg * 50);
+	//cv::imwrite("unary_bg.png", unary_bg * 50);
+	//cv::imwrite("unary_fg.png", unary_fg * 50);
 }
 
 /*
@@ -611,6 +611,20 @@ void MakeRegionMask_NKJ(std::vector<cv::Point> &vecPts, cv::Mat &frangiScale,
 	convScale.release();
 }
 
+cv::Mat Convert2OnlyFGBG(cv::Mat &gcm, uchar BG, uchar FG)
+{
+	cv::Mat om(gcm.size(), CV_8UC1);
+	for (int y = 0; y < gcm.rows; y++) {
+		for (int x = 0; x < gcm.cols; x++) {
+			uchar p = gcm.at<uchar>(y, x);
+			if (p == cv::GC_BGD || p == cv::GC_PR_BGD)
+				om.at<uchar>(y, x) = BG;
+			if (p == cv::GC_FGD || p == cv::GC_PR_FGD)
+				om.at<uchar>(y, x) = FG;
+		}
+	}
+	return om;
+}
 
 // generate vessel segmentation mask from vessel centerline points 
 // using graph cuts
@@ -622,51 +636,75 @@ void MakeRegionMask_NKJ(std::vector<cv::Point> &vecPts, cv::Mat &frangiScale,
 //			 draw filled circles at the corresponding point with radius scale
 cv::Mat MakeRegionMask_GraphCut(std::vector<cv::Point> &vecPts,
 	cv::Mat &frangiScale,
-	cv::Mat &img, cv::Mat &mask)
+	cv::Mat &img, cv::Mat &mask,
+	bool bPR_BGD_is_NarrowBand, int bgd_nb_sz, int fgd_nb_sz)
 {
 	int w = mask.rows;
 	int h = mask.cols;
 	// construct mask
 	cv::Mat gc_mask(mask.size(), CV_8UC1);
-
-	// initialize to PROBABLY_BGD
+	cv::Rect gc_roi;
+	// initialize to GC_BGD
 	gc_mask.setTo(cv::Scalar(cv::GC_BGD));
 
-	// make ROI based on current vessel points
-	int minvx, maxvx, minvy, maxvy;
-	minvx = minvy = INT_MAX;
-	maxvx = maxvy = INT_MIN;
-	for (int k = 0; k < vecPts.size(); k++) {
-		if (vecPts[k].x < minvx) minvx = vecPts[k].x;
-		if (vecPts[k].y < minvy) minvy = vecPts[k].y;
-		if (vecPts[k].x > maxvx) maxvx = vecPts[k].x;
-		if (vecPts[k].y > maxvy) maxvy = vecPts[k].y;
+	// if probably background is defined as narrowband surrounding vessel region
+	if (bPR_BGD_is_NarrowBand)
+	{
+		// set mask by frangi-max-response-scale region as PROBABLY_FGD 
+		cv::Mat v_pbg = cv::Mat::zeros(gc_mask.size(), CV_8UC1);
+		MakeRegionMask_NKJ(vecPts, frangiScale, v_pbg, cv::Scalar(cv::GC_PR_BGD));
+		cv::Mat se_bg = cv::getStructuringElement(cv::MORPH_ELLIPSE,
+			cv::Size(2 * bgd_nb_sz + 1, 2 * bgd_nb_sz + 1),
+			cv::Point(bgd_nb_sz, bgd_nb_sz));
+		cv::dilate(v_pbg, v_pbg, se_bg);
+		cv::Mat v_pfg = cv::Mat::zeros(gc_mask.size(), CV_8UC1);
+		MakeRegionMask_NKJ(vecPts, frangiScale, v_pfg, cv::Scalar(cv::GC_PR_FGD));
+		if (fgd_nb_sz > 0) {
+			cv::Mat se_fg = cv::getStructuringElement(cv::MORPH_ELLIPSE,
+				cv::Size(2 * fgd_nb_sz + 1, 2 * fgd_nb_sz + 1),
+				cv::Point(fgd_nb_sz, fgd_nb_sz));
+			cv::erode(v_pfg, v_pfg, se_fg);
+		}
+		gc_mask = cv::max(cv::max(gc_mask, v_pbg), v_pfg);
 	}
-	// add buffer for roi
-	int roi_buf = 10;
-	minvx = cv::max(0, minvx - roi_buf);
-	minvy = cv::max(0, minvy - roi_buf);
-	maxvx = cv::min(w, maxvx + roi_buf);
-	maxvy = cv::min(h, maxvy + roi_buf);
-	cv::Rect gc_roi(minvx, minvy, maxvx - minvx, maxvy - minvy);
-	cv::Mat gc_mask_roi = gc_mask(gc_roi);
-	gc_mask_roi.setTo(cv::Scalar(cv::GC_PR_BGD));
-
-	// set mask by frangi-max-response-scale region as PROBABLY_FGD 
-	MakeRegionMask_NKJ(vecPts, frangiScale, gc_mask, cv::Scalar(cv::GC_PR_FGD));
+	// else, probably background is defined by vessel point bounding box
+	else
+	{
+		// make ROI based on current vessel points
+		int minvx, maxvx, minvy, maxvy;
+		minvx = minvy = INT_MAX;
+		maxvx = maxvy = INT_MIN;
+		for (int k = 0; k < vecPts.size(); k++) {
+			if (vecPts[k].x < minvx) minvx = vecPts[k].x;
+			if (vecPts[k].y < minvy) minvy = vecPts[k].y;
+			if (vecPts[k].x > maxvx) maxvx = vecPts[k].x;
+			if (vecPts[k].y > maxvy) maxvy = vecPts[k].y;
+		}
+		// add buffer for roi
+		int roi_buf = 10;
+		minvx = cv::max(0, minvx - roi_buf);
+		minvy = cv::max(0, minvy - roi_buf);
+		maxvx = cv::min(w, maxvx + roi_buf);
+		maxvy = cv::min(h, maxvy + roi_buf);
+		gc_roi = cv::Rect(minvx, minvy, maxvx - minvx, maxvy - minvy);
+		cv::Mat gc_mask_roi = gc_mask(gc_roi);
+		gc_mask_roi.setTo(cv::Scalar(cv::GC_PR_BGD));
+		MakeRegionMask_NKJ(vecPts, frangiScale, gc_mask, cv::Scalar(cv::GC_PR_FGD));
+	}
+	
 	// set centerline points as DEFINITLY_FGD
 	for (int k = 0; k < vecPts.size(); k++)
 		gc_mask.at<char>(vecPts[k]) = cv::GC_FGD;
 	//cv::imshow("grabcut input mask", gc_mask*63);
-	cv::imwrite("grabcut_input_mask.png", gc_mask * 63);
-	printf("ROI: (%d, %d, %d, %d)", gc_roi.x, gc_roi.y, gc_roi.width, gc_roi.height);
-	//cv::imwrite("grabcut_input_mask.png", gc_mask*63);
+	//cv::imwrite("grabcut_input_mask.png", gc_mask * 63);
+	//printf("ROI: (%d, %d, %d, %d)", gc_roi.x, gc_roi.y, gc_roi.width, gc_roi.height);
+
 	cv::Mat bgdModel, fgdModel;
 	int iterCount = 1;
 	grabCut_mod(img, gc_mask, gc_roi, bgdModel, fgdModel, iterCount,
 		cv::GC_INIT_WITH_MASK);
-	//cv::imshow("grabcut vessel extraction", m_mask*63);
-	cv::imwrite("grabcut_vessel_extraction.png", gc_mask * 63);
-	cv::imwrite("grabcut_input.png", gc_mask * 63);
-	return gc_mask;
+	//cv::imwrite("grabcut_vessel_extraction.png", gc_mask * 63);
+	//cv::imwrite("grabcut_input.png", gc_mask * 63);
+
+	return Convert2OnlyFGBG(gc_mask, 0, 255);
 }

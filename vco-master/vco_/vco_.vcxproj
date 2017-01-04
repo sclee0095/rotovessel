@@ -162,6 +162,7 @@
     <ClInclude Include="ChamferMatching.h" />
     <ClInclude Include="FastMarching.h" />
     <ClInclude Include="FrangiFilter.h" />
+    <ClInclude Include="GC\gcgraph.hpp" />
     <ClInclude Include="Geodesic.h" />
     <ClInclude Include="VCO.h" />
     <ClInclude Include="P2pMatching.h" />

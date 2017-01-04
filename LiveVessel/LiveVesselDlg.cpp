@@ -2216,7 +2216,7 @@ void CLiveVesselDlg::OnBnClickedButtonVcoFrame()
 	for (int j = 0; j < tp1_2d_vec_vescl.size(); j++)
 	{
 		//cv::Mat vimgtp1 = cv::imread(vecFname[cur_frame + 1]);
-		MakeRegionMask_GraphCut(tp1_2d_vec_vescl[j], FrangiScale, d_tp1VesselImg, m_mask);
+		m_mask = MakeRegionMask_GraphCut(tp1_2d_vec_vescl[j], FrangiScale, d_tp1VesselImg, m_mask);
 		//MakeRegionMask_NKJ(tp1_2d_vec_vescl[j]);
 		/*
 		cv::Mat convScale(1, tp1_2d_vec_vescl[j].size(), CV_64FC1);

@@ -81,6 +81,9 @@
     <ClInclude Include="VCOParams.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="GC\gcgraph.hpp">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="TRW_S-v1.3\treeProbabilities.cpp">
