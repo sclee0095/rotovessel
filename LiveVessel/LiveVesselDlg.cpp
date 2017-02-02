@@ -954,7 +954,7 @@ void CLiveVesselDlg::OnLButtonDown(UINT nFlags, CPoint point)
 			//vecPts.push_back(ptEnd);
 			SegmTree.addSegm(vecPts);
 
-			MakeRegionMask_NKJ(vecPts);
+			MakeRegionMask_NKJ(vesselImg,vecPts);
 			/*
 			cv::Mat convScale(1, vecPts.size(), CV_64FC1);
 			for (int k = 0; k < vecPts.size(); k++)
@@ -1291,7 +1291,7 @@ BOOL CLiveVesselDlg::PreTranslateMessage(MSG* pMsg)
 					{
 						std::vector<cv::Point> vecPts;
 						vecPts = SegmTree.get(i);
-						MakeRegionMask_NKJ(vecPts);
+						MakeRegionMask_NKJ(vesselImg,vecPts);
 						/*
 						cv::Mat convScale(1, vecPts.size(), CV_64FC1);
 						for (int k = 0; k < vecPts.size(); k++)
@@ -1647,7 +1647,7 @@ void CLiveVesselDlg::OnLButtonUp(UINT nFlags, CPoint point)
 
 		SegmTree.addSegm(cur_path);
 
-		MakeRegionMask_NKJ(cur_path);
+		MakeRegionMask_NKJ(vesselImg,cur_path);
 		/*
 		cv::Mat convScale(1, cur_path.size(), CV_64FC1);
 		for (int k = 0; k < cur_path.size(); k++)
@@ -2122,7 +2122,7 @@ void CLiveVesselDlg::OnBnClickedButtonVcoFrame()
 	//cv::Mat gaussKernel = cv::getGaussianKernel(23, 4.4f);
 	for (int j = 0; j < tp1_2d_vec_vescl.size(); j++)
 	{
-		MakeRegionMask_NKJ(tp1_2d_vec_vescl[j]);
+		MakeRegionMask_NKJ(vesselImg,tp1_2d_vec_vescl[j]);
 		/*
 		cv::Mat convScale(1, tp1_2d_vec_vescl[j].size(), CV_64FC1);
 		for (int k = 0; k < tp1_2d_vec_vescl[j].size(); k++)
@@ -2550,7 +2550,7 @@ void CLiveVesselDlg::OnBnClickedButtonVcoSequence()
 		//cv::Mat gaussKernel = cv::getGaussianKernel(23, 4.4f);
 		for (int j = 0; j < tp1_2d_vec_vescl.size(); j++)
 		{
-			MakeRegionMask_NKJ(tp1_2d_vec_vescl[j]);
+			MakeRegionMask_NKJ(vesselImg,tp1_2d_vec_vescl[j]);
 			/*
 			cv::Mat convScale(1, tp1_2d_vec_vescl[j].size(), CV_64FC1);
 			for (int k = 0; k < tp1_2d_vec_vescl[j].size(); k++)
@@ -3256,7 +3256,7 @@ UINT CLiveVesselDlg::ThreadFunction(LPVOID _mothod)
 		//cv::Mat gaussKernel = cv::getGaussianKernel(23, 4.4f);
 		for (int j = 0; j < tp1_2d_vec_vescl.size(); j++)
 		{
-			pDlg->MakeRegionMask_NKJ(tp1_2d_vec_vescl[j]);
+			pDlg->MakeRegionMask_NKJ(pDlg->vesselImg,tp1_2d_vec_vescl[j]);
 			/*
 			cv::Mat convScale(1, tp1_2d_vec_vescl[j].size(), CV_64FC1);
 			for (int k = 0; k < tp1_2d_vec_vescl[j].size(); k++)
@@ -3516,8 +3516,219 @@ void CLiveVesselDlg::OnClose()
 
 
 
-void CLiveVesselDlg::MakeRegionMask_NKJ(std::vector<cv::Point> &vecPts)
+void CLiveVesselDlg::MakeRegionMask_NKJ(cv::Mat img, std::vector<cv::Point> &vecPts)
 {
+	////for 모든(또는 현재 vessel segment의) vessel point
+	////	kernel_response(window_size * kernel 스케일 3d array) 초기화
+	////  for (x, y) = 사이즈[w h]의 local window 내 점들마다
+	////		for s = 모든 kernel 스케일
+	////			kernel_response(x, y, s) = kernel 컨벌루션 출력
+	////		end for
+	////	end for
+	////	최대의 response 값의 x, y, s 값 적용
+	////end for
+
+	//// convert image scale
+	//cv::Mat grayscale_img;
+	//if (img.channels() == 3)
+	//	cv::cvtColor(img, grayscale_img, CV_BGR2GRAY);
+	//else
+	//	img.copyTo(grayscale_img);
+
+	//// set sigma
+	//double start_kernel_sigma = 1;
+	//double end_kernel_sigma = 7;
+	//double sigma_inetval = 1.0f;
+	//
+	//// set searching window size, kernal size, rotation dgree
+	//int window_size = 3;
+	//int kernel_size = 40;
+	//int rotation_degree = 10;
+
+	//// make kernels, signmas and stored
+	//std::vector<std::vector<cv::Mat>> vec_2D_kernels;
+	//std::vector<double> vec_sigma;
+	//int selected_kernel = 2; // 0 = 2d line kenel, 1 = 2d circle kernel, 2 = non-gauss kernel
+	//for (double i = start_kernel_sigma; i <= end_kernel_sigma; i += sigma_inetval)
+	//{
+	//	vec_sigma.push_back(i);
+
+
+	//	std::vector<cv::Mat> vec_kernels;
+	//	if (selected_kernel == 0)
+	//	{
+	//		cv::Mat gauss1 = cv::getGaussianKernel(kernel_size*sqrt(2), i);
+	//		cv::Mat gauss2 = cv::getGaussianKernel(kernel_size*sqrt(2), i * 2);
+	//		cv::Mat DoG = gauss2 - gauss1;
+
+	//		cv::Mat kernel_2D = cv::repeat(DoG, 1, kernel_size*sqrt(2));
+	//		for (int j = 0; j < 180; j += rotation_degree)
+	//		{
+	//			cv::Mat rotation_matrix = cv::getRotationMatrix2D(cv::Point2f(kernel_size*sqrt(2) / 2, kernel_size*sqrt(2) / 2), j, 1);
+
+	//			cv::Mat rotation_kernel;
+	//			cv::warpAffine(kernel_2D, rotation_kernel, rotation_matrix, cv::Size(kernel_size*sqrt(2), kernel_size*sqrt(2)));
+
+	//			cv::Mat crop_rotation_kernel = rotation_kernel(
+	//				cv::Rect(
+	//				kernel_size*sqrt(2) / 2 - kernel_size / 2,
+	//				kernel_size*sqrt(2) / 2 - kernel_size / 2,
+	//				kernel_size,
+	//				kernel_size)).clone();
+
+	//			//// check rotation kernel
+	//			//double minv, maxv;
+	//			//cv::minMaxIdx(rotation_kernel, &minv, &maxv);
+	//			//cv::Mat check_rotation = (rotation_kernel - minv) / (maxv - minv) * 255;
+	//			//check_rotation.convertTo(check_rotation, CV_8UC1);
+	//			//cv::imshow("check_rotation", check_rotation);
+	//			//cv::waitKey();
+	//			crop_rotation_kernel.convertTo(crop_rotation_kernel, CV_64FC1);
+	//			vec_kernels.push_back(crop_rotation_kernel);
+	//		}
+	//	}
+	//	else if (selected_kernel == 1)
+	//	{
+	//		cv::Mat gauss1 = cv::getGaussianKernel(kernel_size, i);
+	//		cv::Mat gauss2 = cv::getGaussianKernel(kernel_size, i * 2);
+	//		//cv::Mat DoG = gauss2 - gauss1;
+
+	//		cv::Mat gauss1_X = cv::repeat(gauss1, 1, kernel_size);
+	//		cv::Mat gauss1_Y = gauss1_X.t();
+	//		cv::Mat gauss2_X = cv::repeat(gauss2, 1, kernel_size);
+	//		cv::Mat gauss2_Y = gauss2_X.t();
+
+	//		//cv::Mat kernel_2D_X = cv::repeat(DoG, 1, kernel_size);
+	//		//cv::Mat kernel_2D_Y = kernel_2D_X.t();
+
+	//		//cv::Mat kernel_2D =  kernel_2D_X*kernel_2D_Y;
+	//		cv::Mat kernel_2D(kernel_size, kernel_size,CV_64FC1);
+	//		kernel_2D = 0;
+
+	//		for (int y = 0; y < kernel_2D.rows; y++)
+	//		for (int x = 0; x < kernel_2D.cols; x++)
+	//		{
+	//			kernel_2D.at<double>(y, x) = 
+	//				gauss2_X.at<double>(y, x)*gauss2_Y.at<double>(y, x)
+	//				-gauss1_X.at<double>(y, x)*gauss1_Y.at<double>(y, x);
+	//		}
+
+	//		//// check circle kernel
+	//		//double minv, maxv;
+	//		//cv::minMaxIdx(kernel_2D, &minv, &maxv);
+	//		//cv::Mat check_circle = (kernel_2D - minv) / (maxv - minv) * 255;
+	//		//check_circle.convertTo(check_circle, CV_8UC1);
+	//		//cv::imshow("check_circle", check_circle);
+	//		//cv::waitKey();
+	//		kernel_2D.convertTo(kernel_2D, CV_64FC1);
+	//		vec_kernels.push_back(kernel_2D);
+	//	}
+	//	else if (selected_kernel == 2)
+	//	{
+	//		cv::Mat kernel_2D(kernel_size,kernel_size,CV_64FC1);
+	//		kernel_2D = -1;
+	//		cv::circle(kernel_2D, cv::Point(kernel_size / 2, kernel_size / 2), vec_sigma.back() * 2, 1, -1);
+	//		
+	//		kernel_2D.convertTo(kernel_2D, CV_64FC1);
+	//		//kernel_2D /= 255;
+	//		vec_kernels.push_back(kernel_2D);
+	//	}
+
+	//	//// for check the kernel
+	//	//for (int j = 0; j < DoG.rows; j++)
+	//	//{
+	//	//	printf("%lf\n", DoG.at<double>(j, 0));
+	//	//}
+	//	//cv::Mat check_kernel= cv::repeat(DoG, 1, 100);
+	//	//double minv, maxv;
+	//	//cv::minMaxIdx(check_kernel, &minv, &maxv);
+	//	//check_kernel = (check_kernel - minv) / (maxv - minv) * 255;
+	//	//check_kernel.convertTo(check_kernel, CV_8UC1);
+	//	//cv::imshow("check_kernel",check_kernel);
+	//	//cv::waitKey();
+	//	
+	//	vec_2D_kernels.push_back(vec_kernels);
+	//}
+
+	//// init kernel response sp
+	//int nKernels = (int)vec_2D_kernels.size();
+	//int nPts = (int)vecPts.size();
+	//cv::Mat maximun_response_sigmas = cv::Mat::zeros(1, nPts, CV_64FC1);
+	//cv::Mat maximun_response_pts = cv::Mat::zeros(1, nPts, CV_32SC2);
+	//cv::Mat region_mask(m_height, m_width, CV_8UC1);
+	//region_mask = 0;
+	//for (int i = 0; i < nPts; i++)
+	//{
+	//	double max_response = 0;
+	//	int max_response_sigma_idx = -1;
+	//	int max_response_angle_idx = -1;
+	//	cv::Point max_response_pt(-1,-1);
+
+	//	for (int sy = -window_size / 2; sy < window_size / 2; sy++)
+	//	for (int sx = -window_size / 2; sx < window_size / 2; sx++)
+	//	{
+	//		cv::Mat crop = grayscale_img(
+	//			cv::Rect(vecPts[i].x + sx - kernel_size / 2,
+	//			vecPts[i].y + sy - kernel_size / 2,
+	//			kernel_size,
+	//			kernel_size)).clone();
+	//		crop.convertTo(crop, CV_64FC1);
+	//		
+	//		for (int j = 0; j < nKernels; j++)
+	//		{
+	//			for (int k = 0; k < (int)vec_2D_kernels[j].size(); k++)
+	//			{
+	//				cv::Mat kernel = vec_2D_kernels[j][k].clone();
+	//				cv::Mat mul_mat = crop.mul(kernel);
+	//				cv::Scalar val = cv::sum(mul_mat);
+	//				
+	//				if (val[0]>max_response)
+	//				{
+	//					max_response = val[0];
+	//					max_response_sigma_idx = j;
+	//					max_response_angle_idx = k;
+	//					max_response_pt = cv::Point(vecPts[i] + cv::Point(sx, sy));
+	//				}
+	//			}
+	//		}
+	//	}
+	//	cv::circle(region_mask, max_response_pt, vec_sigma[max_response_sigma_idx]*2, cv::Scalar(255),-1);
+	//	maximun_response_sigmas.at<double>(0, i) = vec_sigma[max_response_sigma_idx] * 2;
+	//	maximun_response_pts.at<cv::Point>(0, i) = max_response_pt;
+	//}
+
+	////// non-smoothing region mask visualization
+	////cv::Mat draw_region = img.clone();
+	////
+	////for (int y = 0; y < m_height; y++)
+	////for (int x = 0; x < m_width; x++)
+	////{
+	////	if (region_mask.at<uchar>(y, x))
+	////	{
+	////		draw_region.at<uchar>(y, x * 3 + 0) = 255;
+	////		//draw_region.at<uchar>(y, x * 3 + 0) = 0;
+	////		//draw_region.at<uchar>(y, x * 3 + 0) = 255;
+	////	}
+	////}
+	////cv::imshow("region_mask", region_mask);
+	////cv::imshow("draw_region", draw_region);
+	////cv::waitKey();
+
+	//bool bSmoothing = false;
+
+	//// smoothing and drawing region mask
+	//cv::Mat smoothing_response_sigmas;
+	//if (bSmoothing)
+	//	cv::GaussianBlur(maximun_response_sigmas, smoothing_response_sigmas, cv::Size(23, 1), 4.4f);
+	//else
+	//	smoothing_response_sigmas = maximun_response_sigmas.clone();
+
+	//for (int i = 0; i < maximun_response_pts.cols; i++)
+	//{
+	//	cv::circle(m_mask, maximun_response_pts.at<cv::Point>(0, i), smoothing_response_sigmas.at<double>(0, i), 255, -1);
+	//}
+
+	// original smoothing before using convolutional max response scale
 	cv::Mat convScale(1, vecPts.size(), CV_64FC1);
 	for (int k = 0; k < vecPts.size(); k++)
 	{

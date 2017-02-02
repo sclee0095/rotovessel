@@ -241,7 +241,7 @@ public:
 
 	// ADDED: SCLEE 20161227
 public:
-	void MakeRegionMask_NKJ(std::vector<cv::Point> &vecPts);
+	void MakeRegionMask_NKJ(cv::Mat img, std::vector<cv::Point> &vecPts);
 
 	// END: SCLEE 20161227
 };

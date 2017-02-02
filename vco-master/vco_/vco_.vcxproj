@@ -68,29 +68,31 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>..\opencv_ectracted_lib2\include;$(IncludePath)</IncludePath>
+    <IncludePath>E:\500_LIB\OpenCV\opencv3.1.0\build\include;$(IncludePath)</IncludePath>
     <OutDir>$(SolutionDir)\bin\</OutDir>
     <TargetName>vco64d</TargetName>
+    <LibraryPath>E:\500_LIB\OpenCV\opencv3.1.0\build\x64\vc12\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>E:\0500_LIB\OpenCV\opencv-3.1\build\include;$(IncludePath)</IncludePath>
+    <IncludePath>E:\500_LIB\OpenCV\opencv3.1.0\build\include;$(IncludePath);$(IncludePath)</IncludePath>
     <TargetName>vco64d</TargetName>
     <OutDir>$(SolutionDir)\bin\</OutDir>
-    <LibraryPath>E:\0500_LIB\OpenCV\opencv-3.1\build\x64\vc12\lib;$(LibraryPath)</LibraryPath>
+    <LibraryPath>E:\500_LIB\OpenCV\opencv3.1.0\build\x64\vc12\lib;$(LibraryPath);$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>..\opencv_ectracted_lib2\include;$(IncludePath)</IncludePath>
+    <IncludePath>E:\500_LIB\OpenCV\opencv3.1.0\build\include</IncludePath>
     <OutDir>$(SolutionDir)\bin\</OutDir>
     <TargetName>vco64</TargetName>
+    <LibraryPath>E:\500_LIB\OpenCV\opencv3.1.0\build\x64\vc12\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>E:\0500_LIB\OpenCV\opencv-3.1\build\include;$(IncludePath)</IncludePath>
+    <IncludePath>E:\500_LIB\OpenCV\opencv3.1.0\build\include;;$(IncludePath)</IncludePath>
     <TargetName>vco64</TargetName>
     <OutDir>$(SolutionDir)\bin\</OutDir>
-    <LibraryPath>E:\0500_LIB\OpenCV\opencv-3.1\build\x64\vc12\lib;$(LibraryPath)</LibraryPath>
+    <LibraryPath>E:\500_LIB\OpenCV\opencv3.1.0\build\x64\vc12\lib;;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
