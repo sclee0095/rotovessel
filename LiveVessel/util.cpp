@@ -61,17 +61,12 @@ void WriteLog(char *_file, int _line, char *_ftn, char *log)
 	if (log)
 		log_file << "\t" << ":" << std::string(log);
 	log_file << std::endl;
+	//if (!log)
+	//	fprintf_s(log_stream, "FILE: %s, LINE %d\n", _file, _line);
+	//else
+	//	fprintf_s(log_stream, "FILE: %s, LINE %d: %s\n", _file, _line, log);
 }
 
-void WriteLog(char *log)
-{
-	log_num_lines++;
-	if (log_num_lines > MAX_LOG_NUM_LINES)
-		InitLogStream(log_stream_path);
-	if (log)
-		log_file << std::string(log);
-	log_file << std::endl;
-}
 
 void CloseLogStream()
 {

@@ -250,6 +250,13 @@ cv::Mat cFrangiFilter::frangi(cv::Mat input, cv::Mat *o_scale)
 	cv::Mat vesselness, scale, angles;
 	frangi2d(input_img_fl, vesselness, scale, angles, opts);
 
+	int exclude_boundary = 3;
+	cv::Rect rc(exclude_boundary, exclude_boundary, input_img.cols - exclude_boundary * 2, input_img.rows - exclude_boundary * 2);
+
+	cv::Mat boundary(input_img.size(), CV_8UC1);
+	boundary = 255;
+	boundary(rc) = 0;
+	vesselness.setTo(0, boundary);
 	//cv::Mat vesselness_8u;
 	//vesselness.copyTo(vesselness_8u);
 

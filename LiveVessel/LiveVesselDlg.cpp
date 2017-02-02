@@ -17,6 +17,7 @@
 #include <time.h>
 
 #ifdef _DEBUG
+#define DEBUG_NEW new(__FILE__, __LINE__)
 #define new DEBUG_NEW
 #endif
 
@@ -84,6 +85,8 @@ CLiveVesselDlg::CLiveVesselDlg(CWnd* pParent /*=NULL*/)
 , m_bOverlay(false)
 , m_bManualEdit(false)
 , mouseL_state(false)
+, m_draw_cur_move_pt(false)
+, m_bIsComputing(false)
 {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
@@ -142,6 +145,8 @@ BEGIN_MESSAGE_MAP(CLiveVesselDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_CHECK_MANUAL_EDIT, &CLiveVesselDlg::OnBnClickedCheckManualEdit)
 	ON_WM_CLOSE()
 END_MESSAGE_MAP()
+
+int CALLBACK BrowseCallback(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData);
 
 
 // CLiveVesselDlg 메시지 처리기
@@ -212,7 +217,7 @@ BOOL CLiveVesselDlg::OnInitDialog()
 	iLineIndex = -1;
 	iLineSelected_state = CLEAR_LINE;
 	//m_nLine = 0;
-
+	
 	///////////////////////
 	// coded by kjNoh 160922
 	selectedFeat = cv::Point(-1, -1);
@@ -276,93 +281,79 @@ void CLiveVesselDlg::OnPaint()
 	{
 		if (m_bLoad)
 		{
-			
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
-			cv::Mat disp;
-			vesselImg.copyTo(disp);
+			//if (m_draw_cur_move_pt)
+			//{
 
-			//if (SegmTree.size() != 0)
-			if (m_bOverlay)
+			//	CPen pen;
+			//	pen.CreatePen(PS_SOLID, 1, RGB(255, 0, 0));    // 빨간색 펜 생성
+			//	
+			//	CDC *dc = m_Picture.GetDC();
+			//	if (!dc)
+			//	{
+			//		int a = 0;
+  	//				AfxMessageBox(_T("error,m_draw_cur_move_pt"));
+			//		MessageBox(_T("test"));
+			//		return;
+			//	}
+  	//			CPen* oldPen = dc->SelectObject(&pen);
+			//	//dc->MoveTo(20, 20);
+			//	//dc->LineTo(30, 30);         // 빨간색으로 선을 그림
+			//	dc->Ellipse(display_pt.x-1, display_pt.y-1, display_pt.x+1, display_pt.y+1);
+			//	dc->SelectObject(oldPen);
+			//
+			//	oldPen->DeleteObject();
+			//	pen.DeleteObject();
+			//	ReleaseDC(dc);
+
+			//	m_draw_cur_move_pt = false;
+			//}
+			//else
 			{
-				WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
-				for (int y = 0; y < m_mask.rows; y++)
-				for (int x = 0; x < m_mask.cols; x++)
-				{
-					if (m_mask.at<uchar>(y, x))
-					{
-						int R = 150;
-						int G = vesselImg.at<uchar>(y, x * 3 + 1);
-						int B = vesselImg.at<uchar>(y, x * 3 + 0);
 
-						disp.at<uchar>(y, x * 3 + 0) = B;
-						disp.at<uchar>(y, x * 3 + 1) = G;
-						disp.at<uchar>(y, x * 3 + 2) = R;
-					}
-					else
-					{
-						int R = vesselImg.at<uchar>(y, x * 3 + 2);
-						int G = vesselImg.at<uchar>(y, x * 3 + 1);
-						int B = vesselImg.at<uchar>(y, x * 3 + 0);
+				WriteLog(__FILE__, __LINE__);
+				cv::Mat disp;
+				vesselImg.copyTo(disp);
 
-						disp.at<uchar>(y, x * 3 + 0) = B;
-						disp.at<uchar>(y, x * 3 + 1) = G;
-						disp.at<uchar>(y, x * 3 + 2) = R;
-					}
-				}
-				
-				for (int i = 0; i < SegmTree.nSegm; i++)
+				//if (SegmTree.size() != 0)
+				if (m_bOverlay)
 				{
-					if (SegmTree.vecSegmTree[i].size() != 0)
+					WriteLog(__FILE__, __LINE__);
+					for (int y = 0; y < m_mask.rows; y++)
+					for (int x = 0; x < m_mask.cols; x++)
 					{
-						WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
-						std::vector<cv::Point> tmp_Segm = SegmTree.get(i);
-						for (int j = 0; j < tmp_Segm.size(); j++)
+						if (m_mask.at<uchar>(y, x))
 						{
-							WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
+							int R = 150;
+							int G = vesselImg.at<uchar>(y, x * 3 + 1);
+							int B = vesselImg.at<uchar>(y, x * 3 + 0);
 
-							int pt_x = tmp_Segm[j].x;
-							int pt_y = tmp_Segm[j].y;
+							disp.at<uchar>(y, x * 3 + 0) = B;
+							disp.at<uchar>(y, x * 3 + 1) = G;
+							disp.at<uchar>(y, x * 3 + 2) = R;
+						}
+						else
+						{
+							int R = vesselImg.at<uchar>(y, x * 3 + 2);
+							int G = vesselImg.at<uchar>(y, x * 3 + 1);
+							int B = vesselImg.at<uchar>(y, x * 3 + 0);
 
-							//// added by kjNoh 161006
-							//int R = 150;
-							//int G = vesselImg.at<uchar>(pt_y, pt_x * 3 + 1);
-							//int B = vesselImg.at<uchar>(pt_y, pt_x * 3 + 0);
-							//cv::circle(disp, cv::Point(pt_x, pt_y), FrangiScale.at<double>(pt_y, pt_x), CV_RGB(R, G, B), -1);
-
-							disp.at<uchar>(pt_y, pt_x * 3 + 0) = 255;
-							disp.at<uchar>(pt_y, pt_x * 3 + 1) = 0;
-							disp.at<uchar>(pt_y, pt_x * 3 + 2) = 0;
+							disp.at<uchar>(y, x * 3 + 0) = B;
+							disp.at<uchar>(y, x * 3 + 1) = G;
+							disp.at<uchar>(y, x * 3 + 2) = R;
 						}
 					}
 
-					if (featureTree.getSize())
-					{
-						WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
-						featureInfo cur_feat = featureTree.get(i);
-						if (cur_feat.spType)
-							cv::circle(disp, cur_feat.sp, 3, CV_RGB(0, 255, 0)); 
-						else
-							cv::circle(disp, cur_feat.sp, 3, CV_RGB(255, 0, 0));
-
-						if (cur_feat.epType)
-							cv::circle(disp, cur_feat.ep, 3, CV_RGB(0, 255, 0));
-						else
-							cv::circle(disp, cur_feat.ep, 3, CV_RGB(255, 0, 0));
-					}
-
-				}
-				//}
-				//else
-				{
 					for (int i = 0; i < SegmTree.nSegm; i++)
 					{
 						if (SegmTree.vecSegmTree[i].size() != 0)
 						{
-							WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
+							WriteLog(__FILE__, __LINE__);
 							std::vector<cv::Point> tmp_Segm = SegmTree.get(i);
 							for (int j = 0; j < tmp_Segm.size(); j++)
 							{
-								WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");;
+								WriteLog(__FILE__, __LINE__);
+
+								assert(0 <= tmp_Segm[j].y && 0 <= tmp_Segm[j].x && tmp_Segm[j].y < m_height, tmp_Segm[j].x < m_width);
 
 								int pt_x = tmp_Segm[j].x;
 								int pt_y = tmp_Segm[j].y;
@@ -381,7 +372,7 @@ void CLiveVesselDlg::OnPaint()
 
 						if (featureTree.getSize())
 						{
-							WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");;
+							WriteLog(__FILE__, __LINE__);
 							featureInfo cur_feat = featureTree.get(i);
 							if (cur_feat.spType)
 								cv::circle(disp, cur_feat.sp, 3, CV_RGB(0, 255, 0));
@@ -395,135 +386,186 @@ void CLiveVesselDlg::OnPaint()
 						}
 
 					}
-				}
-				//DrawPicture(disp);
-
-
-
-				//for (int y = 0; y < FrangiScale.rows; y++)
-				//for (int x = 0; x < FrangiScale.cols; x++)
-				//{
-				//	if (FrangiScale.at<double>(y, x))
-				//	{
-				//		double B = FrangiScale.at<double>(y, x * 3 + 0);
-				//		double G = FrangiScale.at<double>(y, x * 3 + 1);
-				//		double R = 200;
-
-				//		disp.at<uchar>(y, x * 3 + 0) = B;
-				//		disp.at<uchar>(y, x * 3 + 1) = G;
-				//		disp.at<uchar>(y, x * 3 + 2) = R;
-				//	}
-				//}
-
-				if (iLineSelected_state == SELECT_LINE)
-				{
-					assert(SegmTree.nSegm > iLineIndex);
-					WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
-					std::vector<cv::Point> selectedSegm = SegmTree.get(iLineIndex);
-					for (int i = 0; i < selectedSegm.size(); i++)
+					//}
+					//else
 					{
-
-						for (int y = -1; y <= 1; y++)
-						for (int x = -1; x <= 1; x++)
+						for (int i = 0; i < SegmTree.nSegm; i++)
 						{
-							int pt_x = selectedSegm[i].x;
-							int pt_y = selectedSegm[i].y;
-							disp.at<uchar>(pt_y, pt_x * 3 + 0) = 255;
-							disp.at<uchar>(pt_y, pt_x * 3 + 1) = 0;
-							disp.at<uchar>(pt_y, pt_x * 3 + 2) = 255;
+							if (SegmTree.vecSegmTree[i].size() != 0)
+							{
+								WriteLog(__FILE__, __LINE__);
+								std::vector<cv::Point> tmp_Segm = SegmTree.get(i);
+								for (int j = 0; j < tmp_Segm.size(); j++)
+								{
+									WriteLog(__FILE__, __LINE__);;
+
+									assert(0 <= tmp_Segm[j].y && 0 <= tmp_Segm[j].x && tmp_Segm[j].y < m_height, tmp_Segm[j].x < m_width);
+
+									int pt_x = tmp_Segm[j].x;
+									int pt_y = tmp_Segm[j].y;
+
+
+
+									//// added by kjNoh 161006
+									//int R = 150;
+									//int G = vesselImg.at<uchar>(pt_y, pt_x * 3 + 1);
+									//int B = vesselImg.at<uchar>(pt_y, pt_x * 3 + 0);
+									//cv::circle(disp, cv::Point(pt_x, pt_y), FrangiScale.at<double>(pt_y, pt_x), CV_RGB(R, G, B), -1);
+
+									disp.at<uchar>(pt_y, pt_x * 3 + 0) = 255;
+									disp.at<uchar>(pt_y, pt_x * 3 + 1) = 0;
+									disp.at<uchar>(pt_y, pt_x * 3 + 2) = 0;
+								}
+							}
+
+							if (featureTree.getSize())
+							{
+								WriteLog(__FILE__, __LINE__);;
+								featureInfo cur_feat = featureTree.get(i);
+								if (cur_feat.spType)
+									cv::circle(disp, cur_feat.sp, 3, CV_RGB(0, 255, 0));
+								else
+									cv::circle(disp, cur_feat.sp, 3, CV_RGB(255, 0, 0));
+
+								if (cur_feat.epType)
+									cv::circle(disp, cur_feat.ep, 3, CV_RGB(0, 255, 0));
+								else
+									cv::circle(disp, cur_feat.ep, 3, CV_RGB(255, 0, 0));
+							}
+
 						}
 					}
+					//DrawPicture(disp);
 
 
-				}
 
-				else if (iFeatSelected_state == CLEAR_LINE)
-				{
-					if (iLineIndex != -1)
+					//for (int y = 0; y < FrangiScale.rows; y++)
+					//for (int x = 0; x < FrangiScale.cols; x++)
+					//{
+					//	if (FrangiScale.at<double>(y, x))
+					//	{
+					//		double B = FrangiScale.at<double>(y, x * 3 + 0);
+					//		double G = FrangiScale.at<double>(y, x * 3 + 1);
+					//		double R = 200;
+
+					//		disp.at<uchar>(y, x * 3 + 0) = B;
+					//		disp.at<uchar>(y, x * 3 + 1) = G;
+					//		disp.at<uchar>(y, x * 3 + 2) = R;
+					//	}
+					//}
+
+					if (iLineSelected_state == SELECT_LINE)
 					{
 						assert(SegmTree.nSegm > iLineIndex);
-						WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");;
-
-						std::vector<cv::Point> curSegm = SegmTree.get(iLineIndex);
-						for (int i = 0; i < curSegm.size(); i++)
+						WriteLog(__FILE__, __LINE__);;
+						std::vector<cv::Point> selectedSegm = SegmTree.get(iLineIndex);
+						for (int i = 0; i < selectedSegm.size(); i++)
 						{
-							disp.at<uchar>(curSegm[i].y, curSegm[i].x * 3 + 0) = 255;
-							disp.at<uchar>(curSegm[i].y, curSegm[i].x * 3 + 1) = 0;
-							disp.at<uchar>(curSegm[i].y, curSegm[i].x * 3 + 2) = 0;
+
+							for (int y = -1; y <= 1; y++)
+							for (int x = -1; x <= 1; x++)
+							{
+								int pt_x = selectedSegm[i].x;
+								int pt_y = selectedSegm[i].y;
+								disp.at<uchar>(pt_y, pt_x * 3 + 0) = 255;
+								disp.at<uchar>(pt_y, pt_x * 3 + 1) = 0;
+								disp.at<uchar>(pt_y, pt_x * 3 + 2) = 255;
+							}
+						}
+
+
+					}
+
+					else if (iFeatSelected_state == CLEAR_LINE)
+					{
+						if (iLineIndex != -1)
+						{
+							assert(SegmTree.nSegm > iLineIndex);
+							WriteLog(__FILE__, __LINE__);;
+
+							std::vector<cv::Point> curSegm = SegmTree.get(iLineIndex);
+							for (int i = 0; i < curSegm.size(); i++)
+							{
+								disp.at<uchar>(curSegm[i].y, curSegm[i].x * 3 + 0) = 255;
+								disp.at<uchar>(curSegm[i].y, curSegm[i].x * 3 + 1) = 0;
+								disp.at<uchar>(curSegm[i].y, curSegm[i].x * 3 + 2) = 0;
+							}
 						}
 					}
-				}
-				/////////////////////////////////////
-				// codeby kjNoh 160922
-				if (iFeatSelected_state == SELECT_FEATURE)
-				{
-					WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");;
-					int label = FeatrueImg.at<int>(selectedFeat)-1;
-
-					assert(featureTree.nFeature > label);
-
-					if (featureTree.getSize() && label >= 0)
+					/////////////////////////////////////
+					// codeby kjNoh 160922
+					if (iFeatSelected_state == SELECT_FEATURE)
 					{
-						WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
-						featureInfo tmp_feat = featureTree.get(label);
-						if (tmp_feat.sp == selectedFeat)
-						{
-							WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");;
+						WriteLog(__FILE__, __LINE__);;
+						int label = FeatrueImg.at<int>(selectedFeat)-1;
 
-							if (tmp_feat.spType)
-								cv::circle(disp, tmp_feat.sp, 3, CV_RGB(0, 255, 0), -1);
+						assert(featureTree.nFeature > label);
+
+						if (featureTree.getSize() && label >= 0)
+						{
+							WriteLog(__FILE__, __LINE__);
+							featureInfo tmp_feat = featureTree.get(label);
+							if (tmp_feat.sp == selectedFeat)
+							{
+								WriteLog(__FILE__, __LINE__);;
+
+								if (tmp_feat.spType)
+									cv::circle(disp, tmp_feat.sp, 3, CV_RGB(0, 255, 0), -1);
+								else
+									cv::circle(disp, tmp_feat.sp, 3, CV_RGB(255, 0, 0), -1);
+							}
 							else
-								cv::circle(disp, tmp_feat.sp, 3, CV_RGB(255, 0, 0), -1);
+							{
+								WriteLog(__FILE__, __LINE__);;
+								if (tmp_feat.epType)
+									cv::circle(disp, tmp_feat.ep, 3, CV_RGB(0, 255, 0), -1);
+								else
+									cv::circle(disp, tmp_feat.ep, 3, CV_RGB(255, 0, 0), -1);
+							}
 						}
+					}
+					////////////////////////////////////
+
+					if (m_ptCur.x >= 0 && m_ptCur.y >= 0 && m_ptCur.x < vesselImg.cols && m_ptCur.y < vesselImg.rows)
+					{
+						WriteLog(__FILE__, __LINE__);
+						if (ptStart != cv::Point(-1, -1)) {
+							//cv::line(disp, ptStart, ptEnd, CV_RGB(255, 0, 0));
+							// *** LiveVessel method (modified) - find gradient-based geodesic between two points
+							for (int i = 0; i < cur_path.size(); i++)
+							{
+								WriteLog(__FILE__, __LINE__);
+								assert(0 <= cur_path[i].y && 0 <= cur_path[i].x && cur_path[i].y < m_height, cur_path[i].x < m_width);
+
+								disp.at<uchar>(cur_path[i].y, cur_path[i].x * 3 + 0) = 0;
+								disp.at<uchar>(cur_path[i].y, cur_path[i].x * 3 + 1) = 0;
+								disp.at<uchar>(cur_path[i].y, cur_path[i].x * 3 + 2) = 255;
+							}
+							cv::circle(disp, m_ptCur, m_iszDrawCircle, CV_RGB(0, 255, 255), -1);
+						}
+
 						else
 						{
-							WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");;
-							if (tmp_feat.epType)
-								cv::circle(disp, tmp_feat.ep, 3, CV_RGB(0, 255, 0), -1);
-							else
-								cv::circle(disp, tmp_feat.ep, 3, CV_RGB(255, 0, 0), -1);
+							WriteLog(__FILE__, __LINE__);
+							cv::circle(disp, m_ptCur, m_iszDrawCircle, CV_RGB(0, 255, 255), -1);
 						}
+						disp.copyTo(m_disp_tmp);
 					}
 				}
-				////////////////////////////////////
 
-				if (m_ptCur.x >= 0 && m_ptCur.y >= 0 && m_ptCur.x < vesselImg.cols && m_ptCur.y < vesselImg.rows)
-				{
-					WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
-					if (ptStart != cv::Point(-1, -1)) {
-						//cv::line(disp, ptStart, ptEnd, CV_RGB(255, 0, 0));
-						// *** LiveVessel method (modified) - find gradient-based geodesic between two points
-						for (int i = 0; i < cur_path.size(); i++)
-						{
-							WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
-							disp.at<uchar>(cur_path[i].y, cur_path[i].x * 3 + 0) = 0;
-							disp.at<uchar>(cur_path[i].y, cur_path[i].x * 3 + 1) = 0;
-							disp.at<uchar>(cur_path[i].y, cur_path[i].x * 3 + 2) = 255;
-						}
-						cv::circle(disp, m_ptCur, m_iszDrawCircle, CV_RGB(0, 255, 255), -1);
-					}
 
-					else
-					{
-						WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
-						cv::circle(disp, m_ptCur, m_iszDrawCircle, CV_RGB(0, 255, 255), -1);
-					}
-					disp.copyTo(m_disp_tmp);
+				if (m_iMouseState == ZOOM_MODE || m_iMouseState == ZOOMWND_CLICK_DOWN) {
+					WriteLog(__FILE__, __LINE__);
+					printf("onpaint_zoom\n");
+					//cv::circle(m_zoomImg, cv::Point((m_ptCur_Zoom.x / m_fZoomRatio), (m_ptCur_Zoom.y / m_fZoomRatio)), 1, cv::Scalar(0, 0, 255), 1);
+
+					cv::Mat dispZoom;
+					m_zoomImg.copyTo(dispZoom);
+					DrawPictureZoom(dispZoom);
 				}
+
+				DrawPicture(disp);
 			}
-
-
-			if (m_iMouseState == ZOOM_MODE || m_iMouseState == ZOOMWND_CLICK_DOWN) {
-				WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
-				printf("onpaint_zoom\n");
-				//cv::circle(m_zoomImg, cv::Point((m_ptCur_Zoom.x / m_fZoomRatio), (m_ptCur_Zoom.y / m_fZoomRatio)), 1, cv::Scalar(0, 0, 255), 1);
-
-				cv::Mat dispZoom;
-				m_zoomImg.copyTo(dispZoom);
-				DrawPictureZoom(dispZoom);
-			}
-
-			DrawPicture(disp);
 		}
 
 		CDialogEx::OnPaint();
@@ -546,7 +588,6 @@ void CLiveVesselDlg::OnBnClickedButtonImageLoad()
 	//SegmTree->clear();
 	//vecPoints.clear();
 
-	// *** launch UI to get image sequence directory *** //
 	ITEMIDLIST *pidlBrowse=NULL;
 
 	BROWSEINFO brInfo;
@@ -554,9 +595,16 @@ void CLiveVesselDlg::OnBnClickedButtonImageLoad()
 	brInfo.pidlRoot = NULL;
 
 	memset(&brInfo, 0, sizeof(brInfo));
+	
 	brInfo.pszDisplayName = m_pszPathName;
 	brInfo.lpszTitle = _T("Select Directory");
 	brInfo.ulFlags = BIF_RETURNONLYFSDIRS;
+
+	// kjNoh 161131 - my computer settings
+	CString initPath = _T("E:\\40_liveVessel\\data\\MY_BMP_Trunctated sequence");
+	LPCTSTR lpszDefaultFolder = initPath;
+	brInfo.lParam = (LPARAM)lpszDefaultFolder;
+	brInfo.lpfn = BrowseCallback;
 
 	pidlBrowse = ::SHBrowseForFolder(&brInfo);
 
@@ -578,9 +626,7 @@ void CLiveVesselDlg::OnBnClickedButtonImageLoad()
 	}
 	else
 		return;
-	// *** end: launch UI to get image sequence directory *** //
-	
-	// *** generate list of files of image sequence directory *** //
+
 	CFileFind finder;
 	CString str = L"\\*.bmp";
 	CString  strFolderPath = m_pszPathName + str;
@@ -601,29 +647,32 @@ void CLiveVesselDlg::OnBnClickedButtonImageLoad()
 		if ((strA == L".") || (strA == L".."));
 		else
 		{
+			//CString fileName = finder.GetFileTitle();
+			//m_fileName.push_back(fileName);
+
 			strFilePath = finder.GetFilePath();
+
 			std::string filePath = CT2CA(strFilePath.operator LPCWSTR());
 			vecFname.push_back(filePath);
+			//fileName.Empty();
+
 		}
 	}
-	// *** end: generate list of files of image sequence directory *** //
 
 
-	// *** for all vessel sequence frames: (pre-process & save) or (load pre-processed data) *** //
 	for (int i = 0; i < vecFname.size(); i++)
 	{
-		WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnBnClickedButtonImageLoad()");
+		WriteLog(__FILE__, __LINE__);
 
 		vesselImg = cv::imread(vecFname[i]);
 		std::string ffPath = vecFname[i];
 		ffPath.pop_back(); ffPath.pop_back(); ffPath.pop_back();
-		// try to load pre-saved pre-processing data
 		ffPath += "pre";
 		int check = _access(ffPath.data(), 0);
-		// if successful, load saved data
+
 		if (!check)
 		{
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnBnClickedButtonImageLoad()");
+			WriteLog(__FILE__, __LINE__);
 
 			double *ffData = new double[vesselImg.rows*vesselImg.cols];
 			double *ffSacleData = new double[vesselImg.rows*vesselImg.cols];
@@ -641,16 +690,26 @@ void CLiveVesselDlg::OnBnClickedButtonImageLoad()
 			delete[] ffSacleData;
 			fclose(f);
 		}
-		// if not, do pre-processing
 		else
 		{
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnBnClickedButtonImageLoad()");
+			WriteLog(__FILE__, __LINE__);
 
 			cv::Mat gray_vessel;
 			cv::cvtColor(vesselImg, gray_vessel, CV_BGR2GRAY);
 			frangiImg = frfilt.frangi(gray_vessel, &FrangiScale);
 			frangiImg.convertTo(frangiImg, CV_64F);
 			FrangiScale.convertTo(FrangiScale, CV_64F);
+
+			//// for visualization of frangi scale
+			//double minv, maxv;
+			//cv::minMaxIdx(FrangiScale, &minv, &maxv);
+			//cv::Mat vis_FrangiScale = (FrangiScale - minv) / (maxv - minv)*255;
+			//vis_FrangiScale.convertTo(vis_FrangiScale,CV_8UC1);
+
+			//std::string fn_frangi_scale = ffPath;
+			//fn_frangi_scale.pop_back(); fn_frangi_scale.pop_back(); fn_frangi_scale.pop_back(); fn_frangi_scale.pop_back();
+			//fn_frangi_scale += "_frangiSacle.png";
+			//cv::imwrite(fn_frangi_scale, vis_FrangiScale);
 
 			f = fopen(ffPath.data(), "wb+");
 			fwrite(((double*)frangiImg.data), sizeof(double), frangiImg.rows*frangiImg.cols, f);
@@ -659,7 +718,6 @@ void CLiveVesselDlg::OnBnClickedButtonImageLoad()
 			fclose(f);
 		}
 	}
-	// *** end: for all vessel sequence frames: (pre-process & save) or (load pre-processed data) *** //
 
 	std::string segmTree = vecFname[0];
 	segmTree.pop_back(); segmTree.pop_back(); segmTree.pop_back();
@@ -680,7 +738,7 @@ void CLiveVesselDlg::OnBnClickedButtonImageLoad()
 
 			for (int k = 0; k < nPts; k++)
 			{
-				WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnBnClickedButtonImageLoad()");
+				WriteLog(__FILE__, __LINE__);
 				int x; int y;
 				fread(&x, sizeof(int), 1, f);
 				fread(&y, sizeof(int), 1, f);
@@ -694,7 +752,7 @@ void CLiveVesselDlg::OnBnClickedButtonImageLoad()
 			{
 				continue;
 			}
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnBnClickedButtonImageLoad()");
+			WriteLog(__FILE__, __LINE__);
 			SegmTree.addSegm(curSegm);
 
 			int spType;
@@ -711,7 +769,10 @@ void CLiveVesselDlg::OnBnClickedButtonImageLoad()
 			featureTree.addFeat(feat);
 
 		}
+
 		fclose(f);
+
+
 	}
 
 	vesselImg = cv::imread(vecFname[0]);
@@ -735,7 +796,7 @@ void CLiveVesselDlg::OnBnClickedButtonImageLoad()
 	delete[] ffData;
 	delete[] ffSacleData;
 	fclose(f);
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnBnClickedButtonImageLoad()");
+	WriteLog(__FILE__, __LINE__);
 
 	std::string maskPath = vecFname[0];
 	maskPath.pop_back(); maskPath.pop_back(); maskPath.pop_back(); maskPath.pop_back();
@@ -747,10 +808,13 @@ void CLiveVesselDlg::OnBnClickedButtonImageLoad()
 		m_mask = 0;
 	}
 
+
 	m_bLoad = true;
+
 
 	m_ctrlSlider.SetRange(0, vecFname.size() - 1);
 	m_ctrlSlider.SetPos(0);
+
 
 	m_fRatio = vesselImg.cols / (float)m_rcPic.Width();
 
@@ -759,12 +823,30 @@ void CLiveVesselDlg::OnBnClickedButtonImageLoad()
 
 	updateSegm();
 
-	OnPaint();
+	
 
 	str.Empty();
 	strFolderPath.Empty();
 
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnBnClickedButtonImageLoad()");
+
+	m_bitmaphaeader.biSize = sizeof(BITMAPINFOHEADER);
+	//m_bitmaphaeader.biWidth = nX;
+	//m_bitmaphaeader.biHeight = -nY;
+	m_bitmaphaeader.biWidth = m_width;
+	m_bitmaphaeader.biHeight = -m_height;
+	m_bitmaphaeader.biPlanes = 1;
+	m_bitmaphaeader.biBitCount = 24;
+	m_bitmaphaeader.biCompression = BI_RGB;
+	m_bitmaphaeader.biSizeImage = m_width*m_height * 3;
+	m_bitmaphaeader.biXPelsPerMeter = 0;
+	m_bitmaphaeader.biYPelsPerMeter = 0;
+	m_bitmaphaeader.biClrUsed = 0;
+	m_bitmaphaeader.biClrImportant = 0;
+
+
+	OnPaint();
+
+	WriteLog(__FILE__, __LINE__);
 
 	//CString fname;
 	//fname.Format("%s",);
@@ -794,42 +876,47 @@ void CLiveVesselDlg::OnNMCustomdrawSlider1(NMHDR *pNMHDR, LRESULT *pResult)
 
 void CLiveVesselDlg::DrawPicture(cv::Mat disp)
 {
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::DrawPicture()");
+	WriteLog(__FILE__, __LINE__);
 	CRect rc;
 	m_Picture.GetClientRect(rc);
 
 	
-	cv::Mat view_vesselImg;
-	disp.copyTo(view_vesselImg);
-	cv::resize(view_vesselImg, view_vesselImg, cv::Size(rc.Width(), rc.Height()));
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::DrawPicture()");
+	//cv::Mat view_vesselImg;
+	//disp.copyTo(view_vesselImg);
+	//cv::resize(view_vesselImg, view_vesselImg, cv::Size(rc.Width(), rc.Height()));
+	//cv::imshow("disp", disp);
+	//cv::waitKey(1);
+	WriteLog(__FILE__, __LINE__);
 
 	//cv::flip(view_vesselImg, view_vesselImg, 0);
-	int nX = view_vesselImg.cols;
-	int nY = view_vesselImg.rows;
 
-	BITMAPINFOHEADER bitmaphaeader;
-	bitmaphaeader.biSize = sizeof(BITMAPINFOHEADER);
-	bitmaphaeader.biWidth = nX;
-	bitmaphaeader.biHeight = -nY;
-	bitmaphaeader.biPlanes = 1;
-	bitmaphaeader.biBitCount = 24;
-	bitmaphaeader.biCompression = BI_RGB;
-	bitmaphaeader.biSizeImage = nX*nY * 3;
-	bitmaphaeader.biXPelsPerMeter = 0;
-	bitmaphaeader.biYPelsPerMeter = 0;
-	bitmaphaeader.biClrUsed = 0;
-	bitmaphaeader.biClrImportant = 0;
 
-	CDC *pdc = m_Picture.GetDC();
-	HDC hdc = pdc->m_hDC;
+	//uchar *data = new uchar[m_height*m_width*3];
+	//for (int y = 0; y < m_height; y++)
+	//for (int x = 0; x < m_width; x++)
+	//{
+	//	data[y*m_width * 3 + x * 3 + 0] = view_vesselImg.at<uchar>(y, x * 3 + 0);
+	//	data[y*m_width * 3 + x * 3 + 1] = view_vesselImg.at<uchar>(y, x * 3 + 1);
+	//	data[y*m_width * 3 + x * 3 + 2] = view_vesselImg.at<uchar>(y, x * 3 + 2);
+	//}
+	CDC *dc = m_Picture.GetDC();
 
-	char log[260];
-	sprintf_s(log, "nX: %d, nY: %d", nX, nY);
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::DrawPicture()", log);
-	::StretchDIBits(hdc, 0, 0, nX, nY, 0, 0, nX, nY, view_vesselImg.data, (BITMAPINFO*)&bitmaphaeader, DIB_RGB_COLORS, SRCCOPY);
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::DrawPicture()");
-	m_Picture.ReleaseDC(pdc);
+	if (!dc)
+	{
+		int a = 0;
+	}
+
+     ::StretchDIBits(dc->m_hDC, 0, 0, rc.Width(), rc.Height(), 0, 0, m_width, m_height, disp.data, (BITMAPINFO*)&m_bitmaphaeader, DIB_RGB_COLORS, SRCCOPY);
+
+	 ReleaseDC(dc);
+
+	if (!dc)
+	{
+		int a = 0;
+	}
+	//delete[] data;
+
+	WriteLog(__FILE__, __LINE__);
 }
 
 
@@ -844,11 +931,11 @@ void CLiveVesselDlg::OnLButtonDown(UINT nFlags, CPoint point)
 
 	cv::Point center(std::round((point.x - m_rcPic.left) * m_fRatio), std::round((point.y - m_rcPic.top) * m_fRatio));
 
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnLButtonDown()");
+	WriteLog(__FILE__, __LINE__);
 
 	if (0 <= center.x && center.x < m_width&& 0 <= center.y && center.y < m_height)
 	{
-		WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnLButtonDown()");
+		WriteLog(__FILE__, __LINE__);
 		m_Picture.SetFocus();
 		if (ptStart == cv::Point(-1, -1))
 		{
@@ -858,7 +945,7 @@ void CLiveVesselDlg::OnLButtonDown(UINT nFlags, CPoint point)
 			if (iFeatSelected_state == SELECT_FEATURE)
 			{
 				ptStart = selectedFeat;
-				WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnLButtonDown()");
+				WriteLog(__FILE__, __LINE__);
 			}
 			else
 			{
@@ -867,11 +954,9 @@ void CLiveVesselDlg::OnLButtonDown(UINT nFlags, CPoint point)
 				for (int y = -1; y <= 1; y++)
 				for (int x = -1; x <= 1; x++)
 				{
-					// DEBUGGED: SOOCHAHN LEE, 20161219-11:49:00
-					// changed AND && to OR ||
-					if ((y == 0 && x == 0) || 
-						center.x + x < 0 || center.y + y < 0 ||
-						center.x + x >= vesselImg.cols || center.y + y >= vesselImg.rows)
+					if (y == x&&
+						center.x + x <0 && center.y + y <0 &&
+						center.x + x >= vesselImg.cols&&center.y + y >= vesselImg.rows)
 						continue;
 
 					if (SegLabelImg.at<int>(center.y + y, center.x + x))
@@ -891,10 +976,12 @@ void CLiveVesselDlg::OnLButtonDown(UINT nFlags, CPoint point)
 				else
 					ptStart = center;
 
-				WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnLButtonDown()");
+				WriteLog(__FILE__, __LINE__);
 			}
 				
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnLButtonDown()");
+
+			WriteLog(__FILE__, __LINE__);
+
 			ptEnd = center;
 
 			//m_iMouseState = SP_CLICK_DOWN;
@@ -906,7 +993,7 @@ void CLiveVesselDlg::OnLButtonDown(UINT nFlags, CPoint point)
 			if (iFeatSelected_state == SELECT_FEATURE)
 			{
 				ptEnd = selectedFeat;
-				WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnLButtonDown()");
+				WriteLog(__FILE__, __LINE__);
 			}
 			else
 			{
@@ -937,16 +1024,15 @@ void CLiveVesselDlg::OnLButtonDown(UINT nFlags, CPoint point)
 				}
 				else
 					ptEnd = center;
-				WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnLButtonDown()");
+				WriteLog(__FILE__, __LINE__);
 			}
 				
-
-			//PointsOfLine();
-
+			// compute shortest path
 			fmm.compute_discrete_geodesic(frangiDist, ptEnd, &cur_path);
 			std::reverse(cur_path.begin(), cur_path.end()); // coeded by kjNoh 160922
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnLButtonDown()");
+			WriteLog(__FILE__, __LINE__);
 
+			//store lien path
 			std::vector<cv::Point> vecPts;
 			//vecPts.push_back(ptStart);
 			for (int i = 0; i < cur_path.size(); i++)
@@ -954,8 +1040,9 @@ void CLiveVesselDlg::OnLButtonDown(UINT nFlags, CPoint point)
 			//vecPts.push_back(ptEnd);
 			SegmTree.addSegm(vecPts);
 
-			MakeRegionMask_NKJ(vesselImg,vecPts);
-			/*
+
+			// get scale each centerline and store for line smoothing 
+			// coded by noh
 			cv::Mat convScale(1, vecPts.size(), CV_64FC1);
 			for (int k = 0; k < vecPts.size(); k++)
 			{
@@ -966,8 +1053,10 @@ void CLiveVesselDlg::OnLButtonDown(UINT nFlags, CPoint point)
 				convScale.at<double>(0, k) = s;
 			}
 
+			// line smoothing using gussian kernel 
 			cv::GaussianBlur(convScale, convScale, cv::Size(23, 1), 4.4f);
 
+			// draw region segment mask
 			for (int k = 0; k < vecPts.size(); k++)
 			{
 				int cur_x = vecPts[k].x;
@@ -978,29 +1067,33 @@ void CLiveVesselDlg::OnLButtonDown(UINT nFlags, CPoint point)
 				cv::circle(m_mask, cv::Point(cur_x, cur_y), convScale.at<double>(0, k), 255, -1);
 			}
 			convScale.release();
-			*/
-
 
 			//////////////////////////
 			//coded by kjNoh 160922 
+			
+			// init featcure information structure(featureInfo)
 			featureInfo cur_spepInfor;
 			cur_spepInfor.sp = ptStart;
 			cur_spepInfor.ep = ptEnd;
 			cur_spepInfor.spType = 0;
 			cur_spepInfor.epType = 0;
 
+			// add current featrue information at featrueTree
 			featureTree.addFeat(cur_spepInfor);
 
+			// record current segment number at SegLabelImg matrix
 			for (int i = 0; i < vecPts.size(); i++)
 				SegLabelImg.at<int>(vecPts[i]) = SegmTree.nSegm;
 
+			// record current segment ends point at FeatureImg matrix
 			FeatrueImg.at<int>(vecPts[0]) = SegmTree.nSegm;
 			FeatrueImg.at<int>(vecPts.back()) = SegmTree.nSegm;
+
 			////////////////////////
 
 
 			ptStart = ptEnd;
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnLButtonDown()");
+			WriteLog(__FILE__, __LINE__);
 
 		}
 		
@@ -1009,42 +1102,45 @@ void CLiveVesselDlg::OnLButtonDown(UINT nFlags, CPoint point)
 			mouseL_state = true;
 			cur_path.clear();
 			m_prePt = ptStart;
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnLButtonDown()");
+			WriteLog(__FILE__, __LINE__);
 		}
 		else
 		{
 
-			double pfm_start_points[] = { ptStart.y, ptStart.x };
+			//double pfm_start_points[] = { ptStart.y, ptStart.x };
+			double pfm_start_points[] = { ptStart.x, ptStart .y};
 			double nb_iter_max = std::min(pram.pfm_nb_iter_max, (1.2*std::max(frangiImg.rows, frangiImg.cols)*std::max(frangiImg.rows, frangiImg.cols)));
 
 			cv::Mat transPose_frangiImg;
-			cv::transpose(frangiImg, transPose_frangiImg);
+			//cv::transpose(frangiImg, transPose_frangiImg);
 
 			transPose_frangiImg.setTo(1e-10, transPose_frangiImg < 1e-10);
 
 			double *S;
 
-			fmm.fast_marching(transPose_frangiImg, frangiImg.cols, frangiImg.rows, pfm_start_points, 1, 0, 0, nb_iter_max,
+			//fmm.fast_marching(transPose_frangiImg, frangiImg.cols, frangiImg.rows, pfm_start_points, 1, 0, 0, nb_iter_max,
+			//	&frangiDist, &S);
+			fmm.fast_marching(frangiImg, frangiImg.cols, frangiImg.rows, pfm_start_points, 1, 0, 0, nb_iter_max,
 				&frangiDist, &S);
-			frangiDist = frangiDist.t();
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnLButtonDown()");
+			//frangiDist = frangiDist.t();
+			WriteLog(__FILE__, __LINE__);
 
 		}
 	}
 
 	if (m_bZoom)
 	{
-		WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnLButtonDown()");
+		WriteLog(__FILE__, __LINE__);
 		if (0 <= center.x && center.x < m_rcPic.Width() && 0 <= center.y && center.y < m_rcPic.Height())
 		if (m_iMode_zoomWnd != 1)
 			m_ptZoom = center;
 
 		if (0 <= point.x - m_rcZoom.left && point.x - m_rcZoom.left < m_rcZoom.Width() && 0 <= point.y - m_rcZoom.top && point.y - m_rcZoom.top < m_rcZoom.Height())
 		{
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnLButtonDown()");
+			WriteLog(__FILE__, __LINE__);
 			if (!m_bMove)
 			{
-				WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnLButtonDown()");
+				WriteLog(__FILE__, __LINE__);
 				m_iMouseState = ZOOMWND_CLICK_DOWN;
 				m_picZoom.SetFocus();
 
@@ -1125,6 +1221,7 @@ void CLiveVesselDlg::OnBnClickedButtonLeftSlide()
 
 void CLiveVesselDlg::OnBnClickedButtonRightSlide()
 {
+	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 	iSliderPos += 1;
 
 	if (iSliderPos > vecFname.size() - 1)
@@ -1155,11 +1252,11 @@ BOOL CLiveVesselDlg::PreTranslateMessage(MSG* pMsg)
 	bool bWorking = false;
 	if (pMsg->message == WM_KEYDOWN)
 	{
-		WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::PreTranslateMessage()");
+		WriteLog(__FILE__, __LINE__);
 		if (!bWorking)
 		{
 
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::PreTranslateMessage()");
+			WriteLog(__FILE__, __LINE__);
 			bWorking = true;
 			switch (pMsg->wParam)
 			{
@@ -1274,6 +1371,9 @@ BOOL CLiveVesselDlg::PreTranslateMessage(MSG* pMsg)
 			case 'Z':
 				if (m_bLoad != 0 && iLineIndex != -1)
 				{
+
+
+
 					//CSegmTree &curSegTree = SegmTree;
 					SegmTree.rmSegm(iLineIndex);
 					//SegmTree.rmSegm(iLineIndex);
@@ -1291,8 +1391,7 @@ BOOL CLiveVesselDlg::PreTranslateMessage(MSG* pMsg)
 					{
 						std::vector<cv::Point> vecPts;
 						vecPts = SegmTree.get(i);
-						MakeRegionMask_NKJ(vesselImg,vecPts);
-						/*
+
 						cv::Mat convScale(1, vecPts.size(), CV_64FC1);
 						for (int k = 0; k < vecPts.size(); k++)
 						{
@@ -1313,7 +1412,6 @@ BOOL CLiveVesselDlg::PreTranslateMessage(MSG* pMsg)
 							cv::circle(m_mask, cv::Point(cur_x, cur_y), convScale.at<double>(0, k), 255, -1);
 						}
 						convScale.release();
-						*/
 					}
 					//cv::imshow("mask_after_edit", m_mask);
 					//cv::waitKey();
@@ -1326,6 +1424,7 @@ BOOL CLiveVesselDlg::PreTranslateMessage(MSG* pMsg)
 					iLineIndex = -1;
 					//dispUpdate();
 					////////////////////////////////////
+
 
 					OnPaint();
 				}
@@ -1386,7 +1485,10 @@ void CLiveVesselDlg::OnMouseMove(UINT nFlags, CPoint point)
 	if (!m_bLoad)
 		return;
 
+	//cur_path.clear();
+	//HCURSOR cursor = GetCursor();
 	
+	display_pt = cv::Point(point.x - m_rcPic.left, point.y - m_rcPic.top);
 
 	iLineSelected_state = CLEAR_LINE;
 	iFeatSelected_state = CLEAR_FEATURE;
@@ -1399,10 +1501,16 @@ void CLiveVesselDlg::OnMouseMove(UINT nFlags, CPoint point)
 	if (0 <= point.x - m_rcPic.left && point.x - m_rcPic.left < m_rcPic.Width() &&
 		0 <= point.y - m_rcPic.top && point.y - m_rcPic.top < m_rcPic.Height())
 	{
-		WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnMouseMove()");
+		WriteLog(__FILE__, __LINE__);
+
+		m_draw_cur_move_pt = true;
 
 		assert(0 <= point.x - m_rcPic.left && point.x - m_rcPic.left < m_rcPic.Width() &&
 			0 <= point.y - m_rcPic.top && point.y - m_rcPic.top < m_rcPic.Height());
+		
+		
+		SetCursor(LoadCursor(NULL,NULL));
+
 		//m_Picture.SetFocus();
 
 		//////////////////////////////////////
@@ -1411,6 +1519,9 @@ void CLiveVesselDlg::OnMouseMove(UINT nFlags, CPoint point)
 		//m_ptCur.y = point.y - m_rcPic.top;
 		m_ptCur.x = std::round((point.x - m_rcPic.left)*m_fRatio);
 		m_ptCur.y = std::round((point.y - m_rcPic.top)*m_fRatio);
+		char check_stream[200];
+		sprintf_s(check_stream, "m_fRatio:%f,pt:%d,%d", m_fRatio, m_ptCur.x, m_ptCur.y);
+		WriteLog(__FILE__, __LINE__, check_stream);
 		///////////////////////////////////////
 
 		cv::Point find_pt;
@@ -1434,7 +1545,7 @@ void CLiveVesselDlg::OnMouseMove(UINT nFlags, CPoint point)
 			bool findNearFeat = false;
 			if (mouseR_state)
 				int afdf = 0;
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnMouseMove()");
+			WriteLog(__FILE__, __LINE__);
 			for (int y = -featSearchRagne; y <= featSearchRagne; y++)
 			{
 				for (int x = -featSearchRagne; x <= featSearchRagne; x++)
@@ -1442,7 +1553,7 @@ void CLiveVesselDlg::OnMouseMove(UINT nFlags, CPoint point)
 					if (m_ptCur.y + y >= 0 && m_ptCur.y + y < m_height &&m_ptCur.x + x >= 0 && m_ptCur.x + x < m_width)
 					if (FeatrueImg.at<int>(m_ptCur.y + y, m_ptCur.x + x))
 					{
-						WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnMouseMove()");
+						WriteLog(__FILE__, __LINE__);
 						iFeatSelected_state = SELECT_FEATURE;
 						selectedFeat = cv::Point(m_ptCur.x + x, m_ptCur.y + y);
 						findNearFeat = true;
@@ -1450,12 +1561,16 @@ void CLiveVesselDlg::OnMouseMove(UINT nFlags, CPoint point)
 					}
 				}
 				if (findNearFeat)
-					break;
+				{
+					m_draw_cur_move_pt = false;
+					break; 
+				}
+					
 			}
 			//if (!findNearFeat)
 			//{
 			bool findNearSeg = false;
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnMouseMove()");
+			WriteLog(__FILE__, __LINE__);
 			for (int y = -2; y <= 2; y++)
 			{
 				for (int x = -2; x <= 2; x++)
@@ -1469,7 +1584,7 @@ void CLiveVesselDlg::OnMouseMove(UINT nFlags, CPoint point)
 							}*/
 					if (SegLabelImg.at<int>(m_ptCur.y + y, m_ptCur.x + x))
 					{
-						WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnMouseMove()");
+						WriteLog(__FILE__, __LINE__);
 						iLineSelected_state = SELECT_LINE;
 						iLineIndex = SegLabelImg.at<int>(m_ptCur.y + y, m_ptCur.x + x) - 1;
 						find_pt = m_ptCur + cv::Point(x, y);
@@ -1479,7 +1594,11 @@ void CLiveVesselDlg::OnMouseMove(UINT nFlags, CPoint point)
 					}
 				}
 				if (findNearSeg)
-					break; WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnMouseMove()");
+				{
+					WriteLog(__FILE__, __LINE__);
+					m_draw_cur_move_pt = false;
+					break;
+				}
 			}
 			//}
 			//////////////////////////////
@@ -1497,38 +1616,43 @@ void CLiveVesselDlg::OnMouseMove(UINT nFlags, CPoint point)
 		}
 		bPaint = true;
 	}
+	else
+		ShowCursor(true); // 커서를 화면에 출력
 
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnMouseMove()");
+	WriteLog(__FILE__, __LINE__);
 	if (vecFname.size() == NULL)
 		return;
 
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnMouseMove()");
-	if (ptStart == cv::Point(-1, -1)) {
-		//edited by kjNoh 160922
-		//m_ptCur.x = point.x - m_rcPic.left;
-		//m_ptCur.y = point.y - m_rcPic.top;
-		m_ptCur.x = std::round((point.x - m_rcPic.left)*m_fRatio);
-		m_ptCur.y = std::round((point.y - m_rcPic.top)*m_fRatio);
-	}
-	else if (ptStart != cv::Point(-1, -1))
-	{
-		//edited by kjNoh 160922
-		//ptEnd.x = point.x - m_rcPic.left;
-		//ptEnd.y = point.y - m_rcPic.top;
-		ptEnd.x = std::round((point.x - m_rcPic.left)*m_fRatio);
-		ptEnd.y = std::round((point.y - m_rcPic.top)*m_fRatio);
+	WriteLog(__FILE__, __LINE__);
+	m_ptCur.x = std::round((point.x - m_rcPic.left)*m_fRatio);
+	m_ptCur.y = std::round((point.y - m_rcPic.top)*m_fRatio);
+	//if (ptStart == cv::Point(-1, -1)) {
+	//	//edited by kjNoh 160922
+	//	//m_ptCur.x = point.x - m_rcPic.left;
+	//	//m_ptCur.y = point.y - m_rcPic.top;
+	//	m_ptCur.x = std::round((point.x - m_rcPic.left)*m_fRatio);
+	//	m_ptCur.y = std::round((point.y - m_rcPic.top)*m_fRatio);
+	//}
+	//else if (ptStart != cv::Point(-1, -1))
+	//{
+	//	//edited by kjNoh 160922
+	//	//ptEnd.x = point.x - m_rcPic.left;
+	//	//ptEnd.y = point.y - m_rcPic.top;
+	//	ptEnd.x = std::round((point.x - m_rcPic.left)*m_fRatio);
+	//	ptEnd.y = std::round((point.y - m_rcPic.top)*m_fRatio);
 
-		//PointsOfLine();
-	}
+	//	//PointsOfLine();
+	//}
 
 	//compute function
 	if (m_ptCur.x >= 0 && m_ptCur.y >= 0 && m_ptCur.x < vesselImg.cols && m_ptCur.y < vesselImg.rows)
 	{
-		assert(0 <= point.x - m_rcPic.left && point.x - m_rcPic.left < m_rcPic.Width() &&
-			0 <= point.y - m_rcPic.top && point.y - m_rcPic.top < m_rcPic.Height());
-		WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnMouseMove()");
+		assert(0 <= m_ptCur.x && m_ptCur.x < m_width &&
+			0 <= m_ptCur.y && m_ptCur.y < m_height);
+		WriteLog(__FILE__, __LINE__);
 		if (mouseL_state&&m_bManualEdit)
 		{
+			WriteLog(__FILE__, __LINE__);
 			std::vector<cv::Point> pts;
 			//cv::line(pts, m_prePt, m_ptCur, 255, 1);
 			pts = getLine(m_prePt, m_ptCur);
@@ -1538,14 +1662,38 @@ void CLiveVesselDlg::OnMouseMove(UINT nFlags, CPoint point)
 			}
 			//cur_path.push_back(m_ptCur);
 			m_prePt = m_ptCur;
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnMouseMove()");
+			m_draw_cur_move_pt = false;
+
+			WriteLog(__FILE__, __LINE__);
 		}
-		else if (ptStart != cv::Point(-1, -1) && ptStart != m_ptCur && !frangiDist.empty())
+		else if (ptStart != cv::Point(-1, -1) && ptStart != m_ptCur && !frangiDist.empty() && frangiDist.at<double>(m_ptCur)<= 10000000)
 		{
+			WriteLog(__FILE__, __LINE__);
+			//m_bIsComputing = true;
+			//cur_path.clear();
+			if (frangiDist.empty())
+			{
+				printf("frangiDist is empty\n");
+			}
+			
 			fmm.compute_discrete_geodesic(frangiDist, m_ptCur, &cur_path);
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnMouseMove()");
+			printf("m_ptCur:%d,%d, legth: %d, frangi value : %f\n", m_ptCur.x, m_ptCur.y, cur_path.size(), frangiDist.at<double>(m_ptCur));
+
+			if (sqrt((ptStart.x - m_ptCur.x)*(ptStart.x - m_ptCur.x) + (ptStart.y - m_ptCur.y)*(ptStart.y - m_ptCur.y))>cur_path.size()*2)
+			{
+				int a = 0;
+
+				printf("check\n");
+			}
+			//m_bIsComputing = false;
+			m_draw_cur_move_pt = false;
+
+			WriteLog(__FILE__, __LINE__);
 		}
+		bPaint = true;
 	}
+
+
 
 	cv::Point center(std::round((point.x - m_rcPic.left) * m_fRatio), std::round((point.y - m_rcPic.top) * m_fRatio));
 
@@ -1556,7 +1704,7 @@ void CLiveVesselDlg::OnMouseMove(UINT nFlags, CPoint point)
 
 	if (m_bZoom)
 	{
-		WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnMouseMove()");
+		WriteLog(__FILE__, __LINE__);
 
 		if (!m_zoomImg.empty()) {
 			m_ptCur_Zoom.x = (point.x - m_rcZoom.left) * m_fZoomRatio;
@@ -1597,11 +1745,16 @@ void CLiveVesselDlg::OnMouseMove(UINT nFlags, CPoint point)
 			}
 		}
 		bPaint = true;
-		WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnMouseMove()");
+		WriteLog(__FILE__, __LINE__);
 	}
+
+		
 	if (bPaint)
-		OnPaint(); 
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnMouseMove()");
+	{
+		WriteLog(__FILE__, __LINE__);
+		OnPaint();
+	}
+
 
 	CDialogEx::OnMouseMove(nFlags, point);
 }
@@ -1609,6 +1762,10 @@ void CLiveVesselDlg::OnMouseMove(UINT nFlags, CPoint point)
 
 void CLiveVesselDlg::OnLButtonUp(UINT nFlags, CPoint point)
 {
+	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
+
+	
+
 	if (m_iMode_zoomWnd == 2)
 		m_vecPtZoom.clear();
 	else if (mouseL_state&&m_bManualEdit)
@@ -1647,8 +1804,6 @@ void CLiveVesselDlg::OnLButtonUp(UINT nFlags, CPoint point)
 
 		SegmTree.addSegm(cur_path);
 
-		MakeRegionMask_NKJ(vesselImg,cur_path);
-		/*
 		cv::Mat convScale(1, cur_path.size(), CV_64FC1);
 		for (int k = 0; k < cur_path.size(); k++)
 		{
@@ -1671,7 +1826,6 @@ void CLiveVesselDlg::OnLButtonUp(UINT nFlags, CPoint point)
 			cv::circle(m_mask, cv::Point(cur_x, cur_y), convScale.at<double>(0, k), 255, -1);
 		}
 		convScale.release();
-		*/
 
 		//////////////////////////
 		//coded by kjNoh 160922 
@@ -1856,11 +2010,14 @@ void CLiveVesselDlg::OnSetFocus(CWnd* pOldWnd)
 	CDialogEx::OnSetFocus(pOldWnd);
 
 	int a = 5;
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 }
 
 
 void CLiveVesselDlg::OnBnClickedButtonZoom()
 {
+	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
 	m_bZoom = true;
 }
 
@@ -1891,17 +2048,13 @@ void CLiveVesselDlg::DrawPictureZoom(cv::Mat disp_zoom)
 	bitmaphaeader.biClrUsed = 0;
 	bitmaphaeader.biClrImportant = 0;
 
-	CDC *pdc = m_picZoom.GetDC();
-	HDC hdc = pdc->m_hDC;
-
-	::StretchDIBits(hdc, 0, 0, nX, nY, 0, 0, nX, nY, view_zoomImg.data, (BITMAPINFO*)&bitmaphaeader, DIB_RGB_COLORS, SRCCOPY);
-	m_picZoom.ReleaseDC(pdc);
+	::StretchDIBits(m_picZoom.GetDC()->m_hDC, 0, 0, nX, nY, 0, 0, nX, nY, view_zoomImg.data, (BITMAPINFO*)&bitmaphaeader, DIB_RGB_COLORS, SRCCOPY);
 }
 
 
 void CLiveVesselDlg::ZoomProcessing()
 {
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::ZoomProcessing()");
+	WriteLog(__FILE__, __LINE__);
 	float iZoom_width = m_rcZoom.Width();
 	float iZoom_height = m_rcZoom.Height();
 
@@ -2100,16 +2253,8 @@ void CLiveVesselDlg::OnBnClickedButtonVcoFrame()
 
 	//cVCO vco(d_tVesselImg, d_tVc, d_tp1VesselImg, cur_frame + 1, nX, nY, false, "result/");
 	bool bPostProc = true;
-	// ***** EXCEPTION THROWN @2016.12.19-02:38:00 ***** //
-	WriteLog(__FILE__, __LINE__, __FUNCTION__, "START OF VCO");
-	char LOG[128];
-	sprintf_s(LOG, "d_tVesselImg.(nrow, ncol):(%d, %d)", d_tVesselImg.rows, d_tVesselImg.cols);	WriteLog(LOG);
-	sprintf_s(LOG, "d_tVc.(nrow, ncol):(%d, %d)", d_tVc.rows, d_tVc.cols);	WriteLog(LOG);
-	sprintf_s(LOG, "d_tp1VesselImg.(nrow, ncol):(%d, %d)", d_tp1VesselImg.rows, d_tp1VesselImg.cols);	WriteLog(LOG);
-	sprintf_s(LOG, "cur_frame, nX, nY: %d, %d, %d", cur_frame, nX, nY);	WriteLog(LOG);
 	cVCO vco(d_tVesselImg, d_tVc, d_tp1VesselImg, cur_frame + 1, nX, nY, m_bPostProc, true, "../result/");
 	vco.VesselCorrespondenceOptimization();
-	WriteLog(__FILE__, __LINE__, __FUNCTION__, "END OF VCO");
 
 	cv::Mat tp1_mask_8u = vco.get_tp1_adjusted_vescl_mask_pp();
 	tp1_mask_8u.copyTo(d_tVc);
@@ -2122,8 +2267,6 @@ void CLiveVesselDlg::OnBnClickedButtonVcoFrame()
 	//cv::Mat gaussKernel = cv::getGaussianKernel(23, 4.4f);
 	for (int j = 0; j < tp1_2d_vec_vescl.size(); j++)
 	{
-		MakeRegionMask_NKJ(vesselImg,tp1_2d_vec_vescl[j]);
-		/*
 		cv::Mat convScale(1, tp1_2d_vec_vescl[j].size(), CV_64FC1);
 		for (int k = 0; k < tp1_2d_vec_vescl[j].size(); k++)
 		{
@@ -2146,7 +2289,6 @@ void CLiveVesselDlg::OnBnClickedButtonVcoFrame()
 			cv::circle(m_mask, cv::Point(cur_x, cur_y), convScale.at<double>(0, k), 255, -1);
 		}
 		convScale.release();
-		*/
 	}
 
 	char maskSavePath[200];
@@ -2332,7 +2474,7 @@ void CLiveVesselDlg::OnBnClickedButtonFinish()
 		std::vector<cv::Point> tmp_Segm = SegmTree.get(i);
 		for (int j = 0; j < tmp_Segm.size(); j++)
 		{
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnBnClickedButtonFinish()");
+			WriteLog(__FILE__, __LINE__);
 			int x, y;
 			x = tmp_Segm[j].x;
 			y = tmp_Segm[j].y;
@@ -2350,7 +2492,7 @@ void CLiveVesselDlg::OnBnClickedButtonFinish()
 	str.pop_back(); str.pop_back(); str.pop_back(); str.pop_back();
 	str += "_vsc_mask";
 	str += ".png";
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnBnClickedButtonFinish()");
+	WriteLog(__FILE__, __LINE__);
 	cv::imwrite(str, result_frame);
 
 	FILE *vscFile;
@@ -2359,7 +2501,7 @@ void CLiveVesselDlg::OnBnClickedButtonFinish()
 	str += "vsc";
 	vscFile = fopen(str.data(), "wb");
 
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnBnClickedButtonFinish()");
+	WriteLog(__FILE__, __LINE__);
 	if (!vscFile)
 		return;
 
@@ -2399,11 +2541,11 @@ void CLiveVesselDlg::OnBnClickedButtonFinish()
 		std::vector<cv::Point> tmp_Segm = SegmTree.get(j);
 		int nCurFrmaeSegmPt = (int)tmp_Segm.size();
 		fwrite(&nCurFrmaeSegmPt, sizeof(int), 1, vscFile);
-		WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnBnClickedButtonFinish()");
+		WriteLog(__FILE__, __LINE__);
 
 		for (int k = 0; k < nCurFrmaeSegmPt; k++)
 		{
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnBnClickedButtonFinish()");
+			WriteLog(__FILE__, __LINE__);
 			int x = tmp_Segm[k].x;
 			int y = tmp_Segm[k].y;
 			fwrite(&x, sizeof(int), 1, vscFile);
@@ -2423,7 +2565,7 @@ void CLiveVesselDlg::OnBnClickedButtonFinish()
 	maskPath += "_mask.png";
 
 	cv::imwrite(maskPath, m_mask);
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnBnClickedButtonFinish()");
+	WriteLog(__FILE__, __LINE__);
 	//FILE *fScale;
 	//std::string ffPath = vecFname[cur_frame];
 	//ffPath.pop_back(); ffPath.pop_back(); ffPath.pop_back();
@@ -2550,8 +2692,6 @@ void CLiveVesselDlg::OnBnClickedButtonVcoSequence()
 		//cv::Mat gaussKernel = cv::getGaussianKernel(23, 4.4f);
 		for (int j = 0; j < tp1_2d_vec_vescl.size(); j++)
 		{
-			MakeRegionMask_NKJ(vesselImg,tp1_2d_vec_vescl[j]);
-			/*
 			cv::Mat convScale(1, tp1_2d_vec_vescl[j].size(), CV_64FC1);
 			for (int k = 0; k < tp1_2d_vec_vescl[j].size(); k++)
 			{
@@ -2574,7 +2714,6 @@ void CLiveVesselDlg::OnBnClickedButtonVcoSequence()
 				cv::circle(m_mask, cv::Point(cur_x, cur_y), convScale.at<double>(0, k), 255, -1);
 			}
 			convScale.release();
-			*/
 		}
 
 		char maskSavePath[200];
@@ -2719,19 +2858,19 @@ void CLiveVesselDlg::OnRButtonDown(UINT nFlags, CPoint point)
 	if (selectedFeat == cv::Point(-1, -1))
 		return;
 
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnRButtonDown()");
+	WriteLog(__FILE__, __LINE__);
 
 	iLineSelected_state = CLEAR_LINE;
 	mouseR_state = 1;
 
 	for (int i = 0; i < featureTree.getSize(); i++)
 	{
-		WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnRButtonDown()");
+		WriteLog(__FILE__, __LINE__);
 
 		featureInfo tmp_feat = featureTree.get(i);
 		if (tmp_feat.sp == selectedFeat && !tmp_feat.spType)
 		{
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnRButtonDown()");
+			WriteLog(__FILE__, __LINE__);
 
 			dragIdx = i;
 			dragSpEp = 0;
@@ -2741,7 +2880,7 @@ void CLiveVesselDlg::OnRButtonDown(UINT nFlags, CPoint point)
 
 		if (tmp_feat.ep == selectedFeat && !tmp_feat.epType)
 		{
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnRButtonDown()");
+			WriteLog(__FILE__, __LINE__);
 
 			dragIdx = i;
 			dragSpEp = 1;
@@ -2752,7 +2891,7 @@ void CLiveVesselDlg::OnRButtonDown(UINT nFlags, CPoint point)
 
 	if (dragSpEp == -1 || dragIdx == -1)
 	{
-		WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnRButtonDown()");
+		WriteLog(__FILE__, __LINE__);
 
 		mouseR_state = 0;
 		return;
@@ -2775,7 +2914,7 @@ void CLiveVesselDlg::OnRButtonDown(UINT nFlags, CPoint point)
 
 	updateSegm();
 
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnRButtonDown()");
+	WriteLog(__FILE__, __LINE__);
 
 	double pfm_start_points[] = { ptStart.y, ptStart.x };
 	double nb_iter_max = std::min(pram.pfm_nb_iter_max, (1.2*std::max(frangiImg.rows, frangiImg.cols)*std::max(frangiImg.rows, frangiImg.cols)));
@@ -2795,7 +2934,7 @@ void CLiveVesselDlg::OnRButtonDown(UINT nFlags, CPoint point)
 
 	frangiDist = frangiDist.t();
 
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnRButtonDown()");
+	WriteLog(__FILE__, __LINE__);
 
 
 	OnPaint();
@@ -2812,12 +2951,12 @@ void CLiveVesselDlg::OnRButtonUp(UINT nFlags, CPoint point)
 	if (!mouseR_state)
 		return;
 
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnRButtonUp()");
+	WriteLog(__FILE__, __LINE__);
 	cv::Point center(std::round((point.x - m_rcPic.left) * m_fRatio), std::round((point.y - m_rcPic.top) * m_fRatio));
 
 	mouseR_state = 0;
 
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnRButtonUp()");
+	WriteLog(__FILE__, __LINE__);
 	// edited by kjNoh 160922
 	if (iFeatSelected_state == SELECT_FEATURE)
 		ptEnd = selectedFeat;
@@ -2832,7 +2971,7 @@ void CLiveVesselDlg::OnRButtonUp(UINT nFlags, CPoint point)
 
 	std::vector<cv::Point> vecPts;
 
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnRButtonUp()");
+	WriteLog(__FILE__, __LINE__);
 
 	//vecPts.push_back(ptStart);
 	for (int i = 0; i < cur_path.size(); i++)
@@ -2842,7 +2981,7 @@ void CLiveVesselDlg::OnRButtonUp(UINT nFlags, CPoint point)
 	// coeded by kjNoh 160922
 	if (!dragSpEp)
 	{
-		WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnRButtonUp()");
+		WriteLog(__FILE__, __LINE__);
 
 		std::reverse(vecPts.begin(), vecPts.end());
 		cv::Point tmp = ptStart;
@@ -2850,7 +2989,7 @@ void CLiveVesselDlg::OnRButtonUp(UINT nFlags, CPoint point)
 		ptEnd = tmp;
 	}
 
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnRButtonUp()");
+	WriteLog(__FILE__, __LINE__);
 
 
 	//SegmTree->insert(SegmTree->begin() + dragIdx, vecPts);
@@ -2865,32 +3004,32 @@ void CLiveVesselDlg::OnRButtonUp(UINT nFlags, CPoint point)
 	cur_spepInfor.ep = ptEnd;
 	if (!dragSpEp)
 	{
-		WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnRButtonUp()");
+		WriteLog(__FILE__, __LINE__);
 
 		cur_spepInfor.spType = 0;
 		cur_spepInfor.epType = oldFeat.epType;
 	}
 	else
 	{
-		WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnRButtonUp()");
+		WriteLog(__FILE__, __LINE__);
 
 		cur_spepInfor.spType = oldFeat.spType;
 		cur_spepInfor.epType = 0;
 	}
 	featureTree.insert(dragIdx, cur_spepInfor);
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnRButtonUp()");
+	WriteLog(__FILE__, __LINE__);
 
 
 	for (int i = 0; i < vecPts.size(); i++)
 		SegLabelImg.at<int>(vecPts[i]) = dragIdx + 1;
 
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnRButtonUp()");
+	WriteLog(__FILE__, __LINE__);
 
 
 	FeatrueImg.at<int>(vecPts[0]) = dragIdx + 1;
 	FeatrueImg.at<int>(vecPts.back()) = dragIdx + 1;
 
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnRButtonUp()");
+	WriteLog(__FILE__, __LINE__);
 
 
 	//////////////////////////
@@ -2903,12 +3042,12 @@ void CLiveVesselDlg::OnRButtonUp(UINT nFlags, CPoint point)
 
 	iLineIndex = -1;
 
-	WriteLog(__FILE__, __LINE__, __FUNCTION__);
+	WriteLog(__FILE__, __LINE__);
 
 	m_mask = 0;
 	for (int i = 0; i < SegmTree.nSegm; i++)
 	{
-		WriteLog(__FILE__, __LINE__, __FUNCTION__);
+		WriteLog(__FILE__, __LINE__);
 
 		std::vector<cv::Point> vecPts;
 		vecPts = SegmTree.get(i);
@@ -2916,7 +3055,7 @@ void CLiveVesselDlg::OnRButtonUp(UINT nFlags, CPoint point)
 		cv::Mat convScale(1, vecPts.size(), CV_64FC1);
 		for (int k = 0; k < vecPts.size(); k++)
 		{
-			WriteLog(__FILE__, __LINE__, __FUNCTION__);
+			WriteLog(__FILE__, __LINE__);
 
 			int cur_x = vecPts[k].x;
 			int cur_y = vecPts[k].y;
@@ -2929,7 +3068,7 @@ void CLiveVesselDlg::OnRButtonUp(UINT nFlags, CPoint point)
 
 		for (int k = 0; k < vecPts.size(); k++)
 		{
-			WriteLog(__FILE__, __LINE__, __FUNCTION__);
+			WriteLog(__FILE__, __LINE__);
 
 			int cur_x = vecPts[k].x;
 			int cur_y = vecPts[k].y;
@@ -2939,7 +3078,7 @@ void CLiveVesselDlg::OnRButtonUp(UINT nFlags, CPoint point)
 		convScale.release();
 	}
 
-	WriteLog(__FILE__, __LINE__, __FUNCTION__);
+	WriteLog(__FILE__, __LINE__);
 
 	updateSegm();
 
@@ -2954,20 +3093,20 @@ void CLiveVesselDlg::OnRButtonUp(UINT nFlags, CPoint point)
 // coded by kjNoh 160922
 void CLiveVesselDlg::updateSegm()
 {
-	WriteLog(__FILE__, __LINE__, __FUNCTION__);
+	WriteLog(__FILE__, __LINE__);
 
 	if (SegLabelImg.empty() || FeatrueImg.empty())
 	{
 		SegLabelImg = cv::Mat::zeros(vesselImg.size(), CV_32SC1);
 		FeatrueImg = cv::Mat::zeros(vesselImg.size(), CV_32SC1);
-		WriteLog(__FILE__, __LINE__, __FUNCTION__);
+		WriteLog(__FILE__, __LINE__);
 
 	}
 	else
 	{
 		SegLabelImg = 0;
 		FeatrueImg = 0;
-		WriteLog(__FILE__, __LINE__, __FUNCTION__);
+		WriteLog(__FILE__, __LINE__);
 
 	}
 
@@ -2975,11 +3114,11 @@ void CLiveVesselDlg::updateSegm()
 
 	for (int i = 0; i < SegmTree.nSegm; i++)
 	{
-		WriteLog(__FILE__, __LINE__, __FUNCTION__);
+		WriteLog(__FILE__, __LINE__);
 
 		if (SegmTree.nSegm)
 		{
-			WriteLog(__FILE__, __LINE__, __FUNCTION__);
+			WriteLog(__FILE__, __LINE__);
 
 			std::vector<cv::Point> segm = SegmTree.get(i);
 			for (int j = 0; j < segm.size(); j++)
@@ -2992,13 +3131,13 @@ void CLiveVesselDlg::updateSegm()
 
 	if (iLineIndex != -1)
 	{
-		WriteLog(__FILE__, __LINE__, __FUNCTION__);
+		WriteLog(__FILE__, __LINE__);
 
 		featureTree.rmFeat(iLineIndex);
 	}
 
 
-	WriteLog(__FILE__, __LINE__, __FUNCTION__);
+	WriteLog(__FILE__, __LINE__);
 }
 /////////////////////////////////////////
 
@@ -3029,13 +3168,12 @@ void CLiveVesselDlg::OnDestroy()
 	//_CrtDumpMemoryLeaks();
 	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
 }
-
 void CLiveVesselDlg::dispUpdate(bool bPaint)
 {
 	iLineSelected_state = CLEAR_LINE;
 	iLineIndex = -1;
 
-	WriteLog(__FILE__, __LINE__, __FUNCTION__);
+	WriteLog(__FILE__, __LINE__);
 
 	iFeatSelected_state = CLEAR_FEATURE ;
 	selectedFeat = cv::Point(-1, -1);
@@ -3048,7 +3186,7 @@ void CLiveVesselDlg::dispUpdate(bool bPaint)
 	SegmTree.rmAll();
 	featureTree.rmAll();
 
-	WriteLog(__FILE__, __LINE__, __FUNCTION__);
+	WriteLog(__FILE__, __LINE__);
 
 	FILE* f;
 
@@ -3056,7 +3194,7 @@ void CLiveVesselDlg::dispUpdate(bool bPaint)
 
 	if (!check)
 	{
-		WriteLog(__FILE__, __LINE__, __FUNCTION__);
+		WriteLog(__FILE__, __LINE__);
 
 		double *ffData = new double[vesselImg.rows*vesselImg.cols];
 		double *ffSacleData = new double[vesselImg.rows*vesselImg.cols];
@@ -3073,7 +3211,7 @@ void CLiveVesselDlg::dispUpdate(bool bPaint)
 	}
 	else
 	{
-		WriteLog(__FILE__, __LINE__, __FUNCTION__);
+		WriteLog(__FILE__, __LINE__);
 
 		cv::Mat gray_vessel;
 		cv::cvtColor(vesselImg, gray_vessel, CV_BGR2GRAY);
@@ -3088,7 +3226,9 @@ void CLiveVesselDlg::dispUpdate(bool bPaint)
 		fclose(f);
 	}
 
-	WriteLog(__FILE__, __LINE__, __FUNCTION__);
+
+
+	WriteLog(__FILE__, __LINE__);
 
 	std::string segmTree = vecFname[iSliderPos];
 	segmTree.pop_back(); segmTree.pop_back(); segmTree.pop_back();
@@ -3096,11 +3236,11 @@ void CLiveVesselDlg::dispUpdate(bool bPaint)
 	check = _access(segmTree.data(), 0);
 
 
-	WriteLog(__FILE__, __LINE__, __FUNCTION__);
+	WriteLog(__FILE__, __LINE__);
 
 	if (!check)
 	{
-		WriteLog(__FILE__, __LINE__, __FUNCTION__);
+		WriteLog(__FILE__, __LINE__);
 
 		int nSegm;
 		f = fopen(segmTree.data(), "rb");
@@ -3108,7 +3248,7 @@ void CLiveVesselDlg::dispUpdate(bool bPaint)
 
 		for (int j = 0; j < nSegm; j++)
 		{
-			WriteLog(__FILE__, __LINE__, __FUNCTION__);
+			WriteLog(__FILE__, __LINE__);
 
 			std::vector<cv::Point> curSegm;
 			int nPts;
@@ -3149,17 +3289,17 @@ void CLiveVesselDlg::dispUpdate(bool bPaint)
 
 		fclose(f);
 
-		WriteLog(__FILE__, __LINE__, __FUNCTION__);
+		WriteLog(__FILE__, __LINE__);
 	}
 
-	WriteLog(__FILE__, __LINE__, __FUNCTION__);
+	WriteLog(__FILE__, __LINE__);
 	std::string maskPath = vecFname[iSliderPos];
 	maskPath.pop_back(); maskPath.pop_back(); maskPath.pop_back(); maskPath.pop_back();
 	maskPath += "_mask.png";
 	m_mask = cv::imread(maskPath, CV_LOAD_IMAGE_GRAYSCALE);
 	if (m_mask.empty())
 	{
-		WriteLog(__FILE__, __LINE__, __FUNCTION__);
+		WriteLog(__FILE__, __LINE__);
 
 		m_mask = cv::Mat(vesselImg.size(), CV_8UC1);
 		m_mask = 0;
@@ -3168,13 +3308,12 @@ void CLiveVesselDlg::dispUpdate(bool bPaint)
 
 	m_ctrlSlider.SetPos(iSliderPos);
 
-	WriteLog(__FILE__, __LINE__, __FUNCTION__);
+	WriteLog(__FILE__, __LINE__);
 
 	if (bPaint)
-		OnPaint(); WriteLog(__FILE__, __LINE__, __FUNCTION__);
+		OnPaint(); WriteLog(__FILE__, __LINE__);
 
 }
-
 UINT CLiveVesselDlg::ThreadFunction(LPVOID _mothod)
 {
 	CLiveVesselDlg *pDlg = (CLiveVesselDlg*)_mothod;
@@ -3231,7 +3370,9 @@ UINT CLiveVesselDlg::ThreadFunction(LPVOID _mothod)
 
 		tmp_Segm.clear();
 	}
+
 	fclose(vscFile);
+
 
 
 	for (int i = cur_frame; i < end_frame; i++)
@@ -3249,15 +3390,12 @@ UINT CLiveVesselDlg::ThreadFunction(LPVOID _mothod)
 
 
 		std::vector<cv::Point> J, End;
-		std::vector<std::vector < cv::Point >> tp1_2d_vec_vescl = 
-			vco.get_adjust_VsegVpts2dArr_pp(&J, &End);
+		std::vector<std::vector < cv::Point >> tp1_2d_vec_vescl = vco.get_adjust_VsegVpts2dArr_pp(&J, &End);
 
 
 		//cv::Mat gaussKernel = cv::getGaussianKernel(23, 4.4f);
 		for (int j = 0; j < tp1_2d_vec_vescl.size(); j++)
 		{
-			pDlg->MakeRegionMask_NKJ(pDlg->vesselImg,tp1_2d_vec_vescl[j]);
-			/*
 			cv::Mat convScale(1, tp1_2d_vec_vescl[j].size(), CV_64FC1);
 			for (int k = 0; k < tp1_2d_vec_vescl[j].size(); k++)
 			{
@@ -3280,7 +3418,6 @@ UINT CLiveVesselDlg::ThreadFunction(LPVOID _mothod)
 				cv::circle(pDlg->m_mask, cv::Point(cur_x, cur_y), convScale.at<double>(0, k), 255, -1);
 			}
 			convScale.release();
-			*/
 		}
 
 
@@ -3465,7 +3602,7 @@ void CLiveVesselDlg::OnBnClickedCheckManualEdit()
 
 std::vector<cv::Point> CLiveVesselDlg::getLine(cv::Point sp, cv::Point ep)
 {
-	WriteLog(__FILE__, __LINE__, __FUNCTION__);
+	WriteLog(__FILE__, __LINE__);
 	int subX = ep.x - sp.x;
 	int subY = ep.y - sp.y;
 
@@ -3479,7 +3616,7 @@ std::vector<cv::Point> CLiveVesselDlg::getLine(cv::Point sp, cv::Point ep)
 	xs.push_back(sp.x);
 	ys.push_back(sp.y);
 
-	WriteLog(__FILE__, __LINE__, __FUNCTION__);
+	WriteLog(__FILE__, __LINE__);
 
 	for (int i = 1; i < 1000+1; i++)
 	{
@@ -3499,7 +3636,7 @@ std::vector<cv::Point> CLiveVesselDlg::getLine(cv::Point sp, cv::Point ep)
 	pos = std::unique(pts.begin(), pts.end());
 	pts.erase(pos, pts.end());
 
-	WriteLog(__FILE__, __LINE__, __FUNCTION__);
+	WriteLog(__FILE__, __LINE__);
 
 	return pts;
 }
@@ -3516,239 +3653,65 @@ void CLiveVesselDlg::OnClose()
 
 
 
-void CLiveVesselDlg::MakeRegionMask_NKJ(cv::Mat img, std::vector<cv::Point> &vecPts)
+int CALLBACK BrowseCallback(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData)
 {
-	////for 모든(또는 현재 vessel segment의) vessel point
-	////	kernel_response(window_size * kernel 스케일 3d array) 초기화
-	////  for (x, y) = 사이즈[w h]의 local window 내 점들마다
-	////		for s = 모든 kernel 스케일
-	////			kernel_response(x, y, s) = kernel 컨벌루션 출력
-	////		end for
-	////	end for
-	////	최대의 response 값의 x, y, s 값 적용
-	////end for
-
-	//// convert image scale
-	//cv::Mat grayscale_img;
-	//if (img.channels() == 3)
-	//	cv::cvtColor(img, grayscale_img, CV_BGR2GRAY);
-	//else
-	//	img.copyTo(grayscale_img);
-
-	//// set sigma
-	//double start_kernel_sigma = 1;
-	//double end_kernel_sigma = 7;
-	//double sigma_inetval = 1.0f;
-	//
-	//// set searching window size, kernal size, rotation dgree
-	//int window_size = 3;
-	//int kernel_size = 40;
-	//int rotation_degree = 10;
-
-	//// make kernels, signmas and stored
-	//std::vector<std::vector<cv::Mat>> vec_2D_kernels;
-	//std::vector<double> vec_sigma;
-	//int selected_kernel = 2; // 0 = 2d line kenel, 1 = 2d circle kernel, 2 = non-gauss kernel
-	//for (double i = start_kernel_sigma; i <= end_kernel_sigma; i += sigma_inetval)
-	//{
-	//	vec_sigma.push_back(i);
-
-
-	//	std::vector<cv::Mat> vec_kernels;
-	//	if (selected_kernel == 0)
-	//	{
-	//		cv::Mat gauss1 = cv::getGaussianKernel(kernel_size*sqrt(2), i);
-	//		cv::Mat gauss2 = cv::getGaussianKernel(kernel_size*sqrt(2), i * 2);
-	//		cv::Mat DoG = gauss2 - gauss1;
-
-	//		cv::Mat kernel_2D = cv::repeat(DoG, 1, kernel_size*sqrt(2));
-	//		for (int j = 0; j < 180; j += rotation_degree)
-	//		{
-	//			cv::Mat rotation_matrix = cv::getRotationMatrix2D(cv::Point2f(kernel_size*sqrt(2) / 2, kernel_size*sqrt(2) / 2), j, 1);
-
-	//			cv::Mat rotation_kernel;
-	//			cv::warpAffine(kernel_2D, rotation_kernel, rotation_matrix, cv::Size(kernel_size*sqrt(2), kernel_size*sqrt(2)));
-
-	//			cv::Mat crop_rotation_kernel = rotation_kernel(
-	//				cv::Rect(
-	//				kernel_size*sqrt(2) / 2 - kernel_size / 2,
-	//				kernel_size*sqrt(2) / 2 - kernel_size / 2,
-	//				kernel_size,
-	//				kernel_size)).clone();
-
-	//			//// check rotation kernel
-	//			//double minv, maxv;
-	//			//cv::minMaxIdx(rotation_kernel, &minv, &maxv);
-	//			//cv::Mat check_rotation = (rotation_kernel - minv) / (maxv - minv) * 255;
-	//			//check_rotation.convertTo(check_rotation, CV_8UC1);
-	//			//cv::imshow("check_rotation", check_rotation);
-	//			//cv::waitKey();
-	//			crop_rotation_kernel.convertTo(crop_rotation_kernel, CV_64FC1);
-	//			vec_kernels.push_back(crop_rotation_kernel);
-	//		}
-	//	}
-	//	else if (selected_kernel == 1)
-	//	{
-	//		cv::Mat gauss1 = cv::getGaussianKernel(kernel_size, i);
-	//		cv::Mat gauss2 = cv::getGaussianKernel(kernel_size, i * 2);
-	//		//cv::Mat DoG = gauss2 - gauss1;
-
-	//		cv::Mat gauss1_X = cv::repeat(gauss1, 1, kernel_size);
-	//		cv::Mat gauss1_Y = gauss1_X.t();
-	//		cv::Mat gauss2_X = cv::repeat(gauss2, 1, kernel_size);
-	//		cv::Mat gauss2_Y = gauss2_X.t();
-
-	//		//cv::Mat kernel_2D_X = cv::repeat(DoG, 1, kernel_size);
-	//		//cv::Mat kernel_2D_Y = kernel_2D_X.t();
-
-	//		//cv::Mat kernel_2D =  kernel_2D_X*kernel_2D_Y;
-	//		cv::Mat kernel_2D(kernel_size, kernel_size,CV_64FC1);
-	//		kernel_2D = 0;
-
-	//		for (int y = 0; y < kernel_2D.rows; y++)
-	//		for (int x = 0; x < kernel_2D.cols; x++)
-	//		{
-	//			kernel_2D.at<double>(y, x) = 
-	//				gauss2_X.at<double>(y, x)*gauss2_Y.at<double>(y, x)
-	//				-gauss1_X.at<double>(y, x)*gauss1_Y.at<double>(y, x);
-	//		}
-
-	//		//// check circle kernel
-	//		//double minv, maxv;
-	//		//cv::minMaxIdx(kernel_2D, &minv, &maxv);
-	//		//cv::Mat check_circle = (kernel_2D - minv) / (maxv - minv) * 255;
-	//		//check_circle.convertTo(check_circle, CV_8UC1);
-	//		//cv::imshow("check_circle", check_circle);
-	//		//cv::waitKey();
-	//		kernel_2D.convertTo(kernel_2D, CV_64FC1);
-	//		vec_kernels.push_back(kernel_2D);
-	//	}
-	//	else if (selected_kernel == 2)
-	//	{
-	//		cv::Mat kernel_2D(kernel_size,kernel_size,CV_64FC1);
-	//		kernel_2D = -1;
-	//		cv::circle(kernel_2D, cv::Point(kernel_size / 2, kernel_size / 2), vec_sigma.back() * 2, 1, -1);
-	//		
-	//		kernel_2D.convertTo(kernel_2D, CV_64FC1);
-	//		//kernel_2D /= 255;
-	//		vec_kernels.push_back(kernel_2D);
-	//	}
-
-	//	//// for check the kernel
-	//	//for (int j = 0; j < DoG.rows; j++)
-	//	//{
-	//	//	printf("%lf\n", DoG.at<double>(j, 0));
-	//	//}
-	//	//cv::Mat check_kernel= cv::repeat(DoG, 1, 100);
-	//	//double minv, maxv;
-	//	//cv::minMaxIdx(check_kernel, &minv, &maxv);
-	//	//check_kernel = (check_kernel - minv) / (maxv - minv) * 255;
-	//	//check_kernel.convertTo(check_kernel, CV_8UC1);
-	//	//cv::imshow("check_kernel",check_kernel);
-	//	//cv::waitKey();
-	//	
-	//	vec_2D_kernels.push_back(vec_kernels);
-	//}
-
-	//// init kernel response sp
-	//int nKernels = (int)vec_2D_kernels.size();
-	//int nPts = (int)vecPts.size();
-	//cv::Mat maximun_response_sigmas = cv::Mat::zeros(1, nPts, CV_64FC1);
-	//cv::Mat maximun_response_pts = cv::Mat::zeros(1, nPts, CV_32SC2);
-	//cv::Mat region_mask(m_height, m_width, CV_8UC1);
-	//region_mask = 0;
-	//for (int i = 0; i < nPts; i++)
-	//{
-	//	double max_response = 0;
-	//	int max_response_sigma_idx = -1;
-	//	int max_response_angle_idx = -1;
-	//	cv::Point max_response_pt(-1,-1);
-
-	//	for (int sy = -window_size / 2; sy < window_size / 2; sy++)
-	//	for (int sx = -window_size / 2; sx < window_size / 2; sx++)
-	//	{
-	//		cv::Mat crop = grayscale_img(
-	//			cv::Rect(vecPts[i].x + sx - kernel_size / 2,
-	//			vecPts[i].y + sy - kernel_size / 2,
-	//			kernel_size,
-	//			kernel_size)).clone();
-	//		crop.convertTo(crop, CV_64FC1);
-	//		
-	//		for (int j = 0; j < nKernels; j++)
-	//		{
-	//			for (int k = 0; k < (int)vec_2D_kernels[j].size(); k++)
-	//			{
-	//				cv::Mat kernel = vec_2D_kernels[j][k].clone();
-	//				cv::Mat mul_mat = crop.mul(kernel);
-	//				cv::Scalar val = cv::sum(mul_mat);
-	//				
-	//				if (val[0]>max_response)
-	//				{
-	//					max_response = val[0];
-	//					max_response_sigma_idx = j;
-	//					max_response_angle_idx = k;
-	//					max_response_pt = cv::Point(vecPts[i] + cv::Point(sx, sy));
-	//				}
-	//			}
-	//		}
-	//	}
-	//	cv::circle(region_mask, max_response_pt, vec_sigma[max_response_sigma_idx]*2, cv::Scalar(255),-1);
-	//	maximun_response_sigmas.at<double>(0, i) = vec_sigma[max_response_sigma_idx] * 2;
-	//	maximun_response_pts.at<cv::Point>(0, i) = max_response_pt;
-	//}
-
-	////// non-smoothing region mask visualization
-	////cv::Mat draw_region = img.clone();
-	////
-	////for (int y = 0; y < m_height; y++)
-	////for (int x = 0; x < m_width; x++)
-	////{
-	////	if (region_mask.at<uchar>(y, x))
-	////	{
-	////		draw_region.at<uchar>(y, x * 3 + 0) = 255;
-	////		//draw_region.at<uchar>(y, x * 3 + 0) = 0;
-	////		//draw_region.at<uchar>(y, x * 3 + 0) = 255;
-	////	}
-	////}
-	////cv::imshow("region_mask", region_mask);
-	////cv::imshow("draw_region", draw_region);
-	////cv::waitKey();
-
-	//bool bSmoothing = false;
-
-	//// smoothing and drawing region mask
-	//cv::Mat smoothing_response_sigmas;
-	//if (bSmoothing)
-	//	cv::GaussianBlur(maximun_response_sigmas, smoothing_response_sigmas, cv::Size(23, 1), 4.4f);
-	//else
-	//	smoothing_response_sigmas = maximun_response_sigmas.clone();
-
-	//for (int i = 0; i < maximun_response_pts.cols; i++)
-	//{
-	//	cv::circle(m_mask, maximun_response_pts.at<cv::Point>(0, i), smoothing_response_sigmas.at<double>(0, i), 255, -1);
-	//}
-
-	// original smoothing before using convolutional max response scale
-	cv::Mat convScale(1, vecPts.size(), CV_64FC1);
-	for (int k = 0; k < vecPts.size(); k++)
+	CHAR lpszDir[255];
+	switch (uMsg)
 	{
-		int cur_x = vecPts[k].x;
-		int cur_y = vecPts[k].y;
-		double s = FrangiScale.at<double>(cur_y, cur_x);
-
-		convScale.at<double>(0, k) = s;
+	case BFFM_INITIALIZED:
+		SendMessage(hwnd, BFFM_SETSELECTION, TRUE, lpData);
+		break;
+	case BFFM_SELCHANGED:
+		if (SHGetPathFromIDList((LPITEMIDLIST)lParam, (LPWSTR)lpszDir))
+			SendMessage(hwnd, BFFM_SETSTATUSTEXT, 0, (LPARAM)lpszDir);
+		break;
 	}
+	return 0;
+}
 
-	cv::GaussianBlur(convScale, convScale, cv::Size(23, 1), 4.4f);
+void CLiveVesselDlg::makeCSV()
+{
+	FILE *csv_f, *vsc_f;
 
-	for (int k = 0; k < vecPts.size(); k++)
+	fopen_s(&csv_f, "test.csv", "w");
+
+	std::vector < std::vector<std::vector<cv::Point>>> vSegtreeGroup;
+	//std::vector < std::vector<std::vector<cv::Point>>> vSegtreeGroup;
+
+	for (int i = 0; i < vecFname.size(); i++)
 	{
-		int cur_x = vecPts[k].x;
-		int cur_y = vecPts[k].y;
-		//test.at<uchar>(cur_y,cur_x*3+0)
-		//double s = FrangiScale[i + 1].at<double>(cur_y, cur_x);
+		std::vector<std::vector<cv::Point>> vSegtree;
+		std::string fn_vsc = vecFname[i];
+		
+		fopen_s(&vsc_f, fn_vsc.data(), "r");
 
-		cv::circle(m_mask, cv::Point(cur_x, cur_y), convScale.at<double>(0, k), 255, -1);
+		int nSeg = 0;
+		fread(&nSeg, sizeof(int), 1, vsc_f);
+		
+		for (int j = 0; j < nSeg; j++)
+		{
+			std::vector<cv::Point> vSeg;
+			int nPt = 0;
+			fread(&nPt, sizeof(int), 1, vsc_f);
+
+			for (int k = 0; k < nPt; k++)
+			{
+				int pt_x, pt_y;
+				fread(&pt_x, sizeof(int), 1, vsc_f);
+				fread(&pt_y, sizeof(int), 1, vsc_f);
+				
+				vSeg.push_back(cv::Point(pt_x,pt_y));
+			}
+
+			//vSeg.push_back(cv::Point(pt_x, pt_y));
+
+
+		}
+
+		fclose(vsc_f);
 	}
-	convScale.release();
+	
+	
+	int fs = 0;
+	//fprintf(csv_f, "Frame Number\t%d", );
 }

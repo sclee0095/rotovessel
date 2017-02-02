@@ -8,6 +8,17 @@
 
 #include "instances.inc"
 
+#if !defined(_AFXDLL)
+#include <windows.h>
+#include <crtdbg.h>
+#if defined(DEBUG) | defined(_DEBUG)
+#if !defined(DEBUG_NEW)
+#define DEBUG_NEW new(_CLIENT_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
+#endif
+#endif
+
 template <class T> void MRFEnergy<T>::SetAutomaticOrdering()
 {
 	int dMin;

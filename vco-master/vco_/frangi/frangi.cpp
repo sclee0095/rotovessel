@@ -128,7 +128,9 @@ void frangi2d(const Mat &src, Mat &maxVals, Mat &whatScale, Mat &outAngles, fran
 		Mat Dxx, Dyy, Dxy;
 
 		frangi2d_hessian(src, Dxx, Dxy, Dyy, sigma);
-		//frangi2d_hessian(src, Dyy, Dxy, Dxx, sigma)
+		//frangi2d_hessian(src, Dyy, Dxy, Dxx, sigma);
+
+
 
 		//correct for scale
 		Dxx = Dxx*sigma*sigma;
@@ -137,7 +139,8 @@ void frangi2d(const Mat &src, Mat &maxVals, Mat &whatScale, Mat &outAngles, fran
 	
 		//calculate (abs sorted) eigenvalues and vectors
 		Mat lambda1, lambda2, Ix, Iy;
-			
+		
+	
 		cv::Mat mul1, mul2;
 		frangi2_eig2image(Dxx, Dxy, Dyy, lambda1, lambda2, Ix, Iy, mul1, mul2);
 

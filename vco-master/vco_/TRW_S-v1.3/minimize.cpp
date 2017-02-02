@@ -8,11 +8,20 @@
 
 #include "instances.inc"
 
+#if !defined(_AFXDLL)
+#include <windows.h>
+#include <crtdbg.h>
+#if defined(DEBUG) | defined(_DEBUG)
+#if !defined(DEBUG_NEW)
+#define DEBUG_NEW new(_CLIENT_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
+#endif
+#endif
 
 //#pragma comment(linker, "⁄entry:WinMainCRTStartup ⁄subsystem:console")
 
-template <class T> int MRFEnergy<T>::Minimize_TRW_S(Options& options, REAL& lowerBound, 
-	REAL& energy, REAL* min_marginals)
+template <class T> int MRFEnergy<T>::Minimize_TRW_S(Options& options, REAL& lowerBound, REAL& energy, REAL* min_marginals)
 {
 	Node* i;
 	Node* j;
@@ -68,8 +77,7 @@ template <class T> int MRFEnergy<T>::Minimize_TRW_S(Options& options, REAL& lowe
 				assert(e->m_tail == i);
 				j = e->m_head;
 
-				vMin = e->m_message.UpdateMessage(m_Kglobal, i->m_K, j->m_K, Di, 
-					e->m_gammaForward, 0, buf);
+				vMin = e->m_message.UpdateMessage(m_Kglobal, i->m_K, j->m_K, Di, e->m_gammaForward, 0, buf);
 
 				// lowerBound += vMin; // do not compute lower bound during the forward pass
 			}

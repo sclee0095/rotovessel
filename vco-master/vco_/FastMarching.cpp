@@ -25,11 +25,7 @@ cFastMarching::~cFastMarching()
 
 
 //#include "mex.h"
-void cFastMarching::fast_marching(
-	cv::Mat i_W, int i_Ww, int i_Wh, 
-	double* sp, int nsp, 
-	double* ep, int nep, 
-	double i_nb_iter_max,
+void cFastMarching::fast_marching(cv::Mat i_W, int i_Ww, int i_Wh, double* sp, int nsp, double* ep, int nep, double i_nb_iter_max,
 	cv::Mat *o_matD, double** o_S)
 {
 

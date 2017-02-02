@@ -239,9 +239,12 @@ public:
 	CStatic m_ctrl_FileName;	
 	afx_msg void OnClose();
 
-	// ADDED: SCLEE 20161227
-public:
-	void MakeRegionMask_NKJ(cv::Mat img, std::vector<cv::Point> &vecPts);
+	BITMAPINFOHEADER m_bitmaphaeader;
+	bool m_draw_cur_move_pt;
+	cv::Point display_pt;
+	bool m_bIsComputing;
 
-	// END: SCLEE 20161227
+	// make and write .CSV file
+	// coded by noh
+	void makeCSV();
 };

@@ -119,8 +119,7 @@ public:
 	// get displacement vector to subtract tp1 frame points to t frame points
 	std::vector<cv::Point> get_disp_vec_arr();
 	// draw displacement vector
-	cv::Mat drawDisplacementeVec(cv::Mat img, std::vector<cv::Point> pre, std::vector<cv::Point> post, 
-		std::vector<cv::Point> dispVec);
+	cv::Mat drawDisplacementeVec(cv::Mat img, std::vector<cv::Point> pre, std::vector<cv::Point> post, std::vector<cv::Point> dispVec);
 
 	// coded by khNoh (20160814)
 	// get information to linked each segmentation at after post processed t+1 frame
@@ -128,8 +127,7 @@ public:
 	std::vector<std::vector<std::vector<std::vector<int>>>> get_tp1_segm_linked_information();
 
 
-	std::vector<std::vector<cv::Point>> get_adjust_VsegVpts2dArr_pp(std::vector<cv::Point> *Junction = NULL, 
-		std::vector<cv::Point> *End = NULL);
+	std::vector<std::vector<cv::Point>> get_adjust_VsegVpts2dArr_pp(std::vector<cv::Point> *Junction = NULL, std::vector<cv::Point> *End = NULL);
 	// *** 
 
 	// *********** END FUNCTIONS RELATED TO VCO ALGORITHM *********** //
@@ -336,12 +334,13 @@ private:
 	// output is center line mask. cv::Mat form(512x512)
 	cv::Mat postProcGrowVessel(
 		//INPUTS
-		cv::Mat img_tp1, 
+		cv::Mat img_tp1,
 		cv::Mat m_frangi_vesselness_tp1,
 		std::vector<cv::Point> all_vessel_pt,
 		cVCOParams params,
 		// INPUT AND OUTPUT
-		std::vector<std::vector<cv::Point>> *E
+		std::vector<std::vector<cv::Point>> *E,
+		std::vector<ves_feat_pt> feat = std::vector<ves_feat_pt>()
 		);
 
 	// converted to C++ by kjNoh (160800)
@@ -356,12 +355,25 @@ private:
 		std::vector<cv::Point> *o_new_lidx, 
 		std::vector<cv::Point> *o_app_lidx
 		);
+	void GrowVesselUsingRegionGrowing(
+		// INPUTS
+		cv::Mat tp1_img,
+		cv::Mat ivessel,
+		std::vector<std::vector<cv::Point>> vscl,
+		std::vector<ves_feat_pt> feat,
+		double thre,
+		cVCOParams p,
+		cv::Mat *o_new_bimg, 
+		std::vector<cv::Point> *o_app_lidx
+		);
+	// compute mean orientation
+	double computeMeanOrientation(std::vector<std::vector<cv::Point>> vscl, int check_spep, int mean_range, int vscl_idx);
 	// compute distance from boundary to seed points
-	void getBoundaryDistance(cv::Mat I, cv::Mat *o_BoundaryDistance);
+	void getBoundaryDistance(cv::Mat I, bool IS3D, cv::Mat *o_BoundaryDistance);
 	// get max distance point in boundary distance map
-	void maxDistancePoint(cv::Mat BoundaryDistance, cv::Mat I, cv::Point *o_posD, double *o_maxD);
+	void maxDistancePoint(cv::Mat BoundaryDistance, cv::Mat I, bool IS3D, cv::Point *o_posD, double *o_maxD);
 	// compute length of input line(std::vector<cv::Point> L)
-	void GetLineLength(std::vector<cv::Point> L, double *o_ll);
+	void GetLineLength(std::vector<cv::Point> L, bool IS3D, double *o_ll);
 
 	// ** END POST PROCESSING FUNCTIONS ** //
 

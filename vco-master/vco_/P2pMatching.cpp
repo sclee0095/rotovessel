@@ -544,14 +544,34 @@ void cP2pMatching::run(cv::Mat img_t, cv::Mat img_tp1, cv::Mat gt_bimg_t,
 void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J, std::vector<cv::Point> &o_end, cv::Mat &bJ,
 	std::vector<std::vector<cv::Point>> &E,cv::Mat &mapMat)
 {
+	// INPUT
+	// bimg : binary image of vessel center line
+	//
+	// OUTPUT
+	// J : store only junction points
+	// o_end : store only end points
+	// bJ : record feature point state whether juntuon point
+	// mapMat : record index of connected feature point as each feature points. 
+	// details
+	// 1. detect end & junction points.
+	// 2. devide INPUT image to draw vessel center line to each segment.
+	//  a. check point to connect
+	//  b. extract vessel segment center line to follow each connected state
+	//   - end to end
+	//   - end to junction
+	//   - junction to junction
+
 	// parameter
 	int patch_half_size = 5;
 
+	// set image size
 	int nY = bimg.rows;
 	int nX = bimg.cols;
 
-	//junction & end point detection
-
+	// junction point detection using matlab code
+	// matlab code
+	// - code to find brach point
+	// - code to find end point
 	cv::Mat copy;
 	bimg.copyTo(copy);
 	cv::Mat C;
@@ -560,7 +580,6 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J, s
 	cv::Mat B;
 	backcount4(copy, B);
 	cv::Mat matE = (B == 1);
-
 	
 	cv::Mat FC = C.mul(~matE);
 	cv::Mat D;
@@ -574,11 +593,11 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J, s
 	cv::Mat M = D&(FC & Vp);
 	cv::Mat branch_img = FC & ~M;
 
-	bool verbe = false;
-	int waitTime = 1;
+	// for visualization
+	bool verbe = false; // if you want to detail process, you should chage value of verbe to "verbe"
+	int waitTime = 1; // for viewing time.(ms)
 
-	
-
+	// end point detection using matlab code
 	cv::Mat end_img;
 	endp(bimg, end_img);
 	std::vector<cv::Point> ends;
@@ -588,13 +607,7 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J, s
 	cv::Mat dilated_branch_img;
 	cv::dilate(branch_img, dilated_branch_img,kernel);
 	cv::Mat CC;
-	//std::vector<cv::Point> CC;
 	int numCC = cv::connectedComponents(dilated_branch_img,CC,4);
-
-	//cv::Mat CC_8u;
-	//CC.convertTo(CC_8u, CV_8UC1);
-	//cv::imshow("CC", CC_8u*40);
-	//cv::waitKey();
 
 	numCC -= 1;
 
@@ -611,10 +624,8 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J, s
 	}
 	std::vector<cv::Point> branch(numCC);
 	
-
 	cv::Mat branch_idx_img;
 	CC.copyTo(branch_idx_img);
-
 	for (int j = 0; j < numCC; j++)
 	{
 		std::vector<cv::Point> tCC = PixelIdxList[j];
@@ -635,12 +646,9 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J, s
 		int cx = round(sumX / (float)tCC.size());
 		cv::Mat patch = ExtractPatchWithZeroPadding(bimg, cv::Point(cx, cy), patch_half_size * 2 + 1);
 
-
 		cv::Mat DT;
 		cv::Mat CPT;
-
-
-		/*[DT, CPT] = */cv::distanceTransform(~patch, DT, CPT, CV_DIST_L1, 3, cv::DIST_LABEL_PIXEL);
+		cv::distanceTransform(~patch, DT, CPT, CV_DIST_L1, 3, cv::DIST_LABEL_PIXEL);
 
 		std::vector<cv::Point> cptSeed;
 		for (int y = 0; y < DT.rows; y++)
@@ -655,10 +663,7 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J, s
 		}
 
 		cv::Point xxyy = cptSeed[CPT.at<int>(patch_half_size + 1, patch_half_size + 1)-1];
-
 		cv::Point cc = xxyy + cv::Point(cx - patch_half_size - 1, cy - patch_half_size - 1);
-
-
 		branch[j] = cc;
 	}
 
@@ -697,7 +702,6 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J, s
 	cv::Mat conn = cv::Mat::zeros(numV, numV,CV_8UC1);
 	mapMat = cv::Mat::zeros(numV, numV,CV_32SC1);
 
-	
 	cv::Mat simg;
 	bimg.copyTo(simg);
 	std::vector<cv::Point> all_CC_pts ; // junction CC
@@ -742,15 +746,7 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J, s
 	}
 
 	for (int j = 0; j < numCC; j++)
-	{
-
-		if (j == 46)
-		{
-			int asdf = 0;
-			waitTime = 0;
-		}
-		
-		
+	{	
 		std::vector<cv::Point> tCC = PixelIdxList[ j ];
 		cv::Mat timg;
 		bimg.copyTo(timg);
@@ -767,11 +763,9 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J, s
 				idx.push_back(k);
 		}
 
-		
 		//int stV = 0; int edV = 0;
 		if (idx.size() == 2) // case: end - end
 		{
-
 			cv::Point stIDX = tCC[0];
 			timg.at<uchar>(stIDX) = 0;
 			
@@ -781,14 +775,12 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J, s
 			cv::Point curPt;
 			// forward path
 			while (true)
-			{
-				
+			{				
 				if (bForwardFirst)
 				{
 					curPt = stIDX;
 					bForwardFirst = false;
 				}
-
 
 				cv::Mat temp = ExtractPatchWithZeroPadding(timg, curPt, 3);
 				std::vector<cv::Point> incXY;
@@ -804,7 +796,6 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J, s
 				if (!nextXY.size())
 					break;
 
-			
 				curPt = cv::Point(nextXY[0]);
 				timg.at<uchar>(curPt) = 0;
 

@@ -61,10 +61,16 @@ void CSegmTree::addSegm(std::vector<cv::Point> segm)
 std::vector<cv::Point> CSegmTree::get(int i)
 {
 	if (!vecSegmTree.size() || i >= vecSegmTree.size())
+	{
+		AfxMessageBox(_T("FILE : %s,LINE : %d",__FILE__,__LINE__));
 		return std::vector<cv::Point>();
+	}
 
 	WriteLog(__FILE__, __LINE__, __FUNCTION__);
 
+	assert(vecSegmTree.size() > i);
+	if (vecSegmTree.size() <= i)
+		AfxMessageBox(_T("FILE : %s,LINE : %d", __FILE__, __LINE__));
 
 	return vecSegmTree[i];
 }
