@@ -389,11 +389,11 @@ private:
 	// compute mean orientation
 	double computeMeanOrientation(std::vector<std::vector<cv::Point>> vscl, int check_spep, int mean_range, int vscl_idx);
 	// compute distance from boundary to seed points
-	void getBoundaryDistance(cv::Mat I, bool IS3D, cv::Mat *o_BoundaryDistance);
+	void getBoundaryDistance(cv::Mat I, cv::Mat *o_BoundaryDistance);
 	// get max distance point in boundary distance map
-	void maxDistancePoint(cv::Mat BoundaryDistance, cv::Mat I, bool IS3D, cv::Point *o_posD, double *o_maxD);
+	void maxDistancePoint(cv::Mat BoundaryDistance, cv::Mat I, cv::Point *o_posD, double *o_maxD);
 	// compute length of input line(std::vector<cv::Point> L)
-	void GetLineLength(std::vector<cv::Point> L, bool IS3D, double *o_ll);
+	void GetLineLength(std::vector<cv::Point> L, double *o_ll);
 
 	// ** END POST PROCESSING FUNCTIONS ** //
 

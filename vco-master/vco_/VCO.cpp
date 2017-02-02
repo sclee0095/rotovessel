@@ -2928,7 +2928,7 @@ double cVCO::computeMeanOrientation(
 
 
 
-void cVCO::GetLineLength(std::vector<cv::Point> L, bool IS3D, double *o_ll)
+void cVCO::GetLineLength(std::vector<cv::Point> L, double *o_ll)
 {
 	double ll = 0;
 	for (int i = 0; i < L.size() - 1; i++)
