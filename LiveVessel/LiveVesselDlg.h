@@ -247,6 +247,7 @@ public:
 	afx_msg void OnBnClickedButtonConvertData();
 	// ADDITIONAL 2017.01.25
 	void OpenEndedFMM(); 
+	void OpenEndedFMM(cv::Point ptEnd); // ADDITIONAL 2017.02.02 kjnoh
 	bool LoadFrangi(std::string ffPath);
 	void SaveFrangi(std::string ffpath);
 	bool LoadVesselCenterlineInfo(std::string vsc_fn);

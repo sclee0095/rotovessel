@@ -888,7 +888,7 @@ void CLiveVesselDlg::OnLButtonDown(UINT nFlags, CPoint point)
 		else
 		{
 			// perform fast-marching method, get frangiDist
-			OpenEndedFMM();
+			OpenEndedFMM(ptEnd);
 			WriteLog(__FILE__, __LINE__, __FUNCTION__);
 		}
 
@@ -981,18 +981,33 @@ void CLiveVesselDlg::OnBnClickedButtonLeftSlide()
 
 void CLiveVesselDlg::OpenEndedFMM()
 {
-	double pfm_start_points[] = { ptStart.y, ptStart.x };
+	double pfm_start_points[] = { ptStart.x, ptStart.y };
 	double nb_iter_max = std::min(pram.pfm_nb_iter_max,
 		(1.2*std::max(frangiImg.rows, frangiImg.cols)*
 		std::max(frangiImg.rows, frangiImg.cols)));
-	cv::Mat transPose_frangiImg;
-	cv::transpose(frangiImg, transPose_frangiImg);
-	transPose_frangiImg.setTo(1e-10, transPose_frangiImg < 1e-10);
+	cv::Mat copy_frangiImg;
+	copy_frangiImg = frangiImg.clone();;
+	copy_frangiImg.setTo(1e-10, copy_frangiImg < 1e-10);
 	double *S;
-	fmm.fast_marching(transPose_frangiImg, frangiImg.cols, frangiImg.rows,
+	fmm.fast_marching(copy_frangiImg, frangiImg.cols, frangiImg.rows,
 		pfm_start_points, 1, 0, 0, nb_iter_max,
 		&frangiDist, &S);
-	frangiDist = frangiDist.t();
+}
+
+void CLiveVesselDlg::OpenEndedFMM(cv::Point ptEnd)
+{
+	double pfm_start_points[] = { ptStart.x, ptStart.y };
+	double pfm_end_points[] = { ptEnd.x, ptEnd.y };
+	double nb_iter_max = std::min(pram.pfm_nb_iter_max,
+		(1.2*std::max(frangiImg.rows, frangiImg.cols)*
+		std::max(frangiImg.rows, frangiImg.cols)));
+	cv::Mat copy_frangiImg;
+	copy_frangiImg = frangiImg.clone();
+	copy_frangiImg.setTo(1e-10, copy_frangiImg < 1e-10);
+	double *S;
+	fmm.fast_marching(copy_frangiImg, frangiImg.cols, frangiImg.rows,
+		pfm_start_points, 1, pfm_end_points, 1, nb_iter_max,
+		&frangiDist, &S);
 }
 
 void CLiveVesselDlg::OnBnClickedButtonRightSlide()
@@ -1410,6 +1425,10 @@ void CLiveVesselDlg::OnMouseMove(UINT nFlags, CPoint point)
 		//ptEnd.y = point.y - m_rcPic.top;
 		ptEnd.x = std::round((point.x - m_rcPic.left)*m_fRatio);
 		ptEnd.y = std::round((point.y - m_rcPic.top)*m_fRatio);
+
+		// update fast marching method distance if you move mouse pointer
+		// edited by kjnoh 170202
+		OpenEndedFMM(ptEnd);
 
 		//PointsOfLine();
 	}
@@ -2459,7 +2478,7 @@ void CLiveVesselDlg::OnRButtonDown(UINT nFlags, CPoint point)
 	updateSegm();
 
 	WriteLog(__FILE__, __LINE__, __FUNCTION__);
-	OpenEndedFMM();
+	OpenEndedFMM(ptEnd);
 	WriteLog(__FILE__, __LINE__, __FUNCTION__);
 
 	OnPaint();

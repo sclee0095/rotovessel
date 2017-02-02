@@ -1155,11 +1155,10 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 	int nX = m_frangi_vesselness_tp1.cols;
 	int nY = m_frangi_vesselness_tp1.rows;
 
-	cv::Mat trs;
-	m_frangi_vesselness_tp1.copyTo(trs);
-	trs.convertTo(trs, CV_64FC1);
-	cv::transpose(trs, trs);
-	trs.setTo(1e-10, trs < 1e-10);
+	cv::Mat copy_frangi;
+	m_frangi_vesselness_tp1.copyTo(copy_frangi);
+	copy_frangi.convertTo(copy_frangi, CV_64FC1);
+	copy_frangi.setTo(1e-10, copy_frangi < 1e-10);
 
 
 	cFastMarching fmm;
@@ -1202,20 +1201,18 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 				int ed_pt_y = ed_pt.y; int ed_pt_x = ed_pt.x;
 
 				// geodesic path
-				double pfm_end_points[] = { ed_pt_y, ed_pt_x };
-				double pfm_start_points[] = { st_pt_y, st_pt_x };
+				double pfm_end_points[] = { ed_pt_x, ed_pt_y };
+				double pfm_start_points[] = { st_pt_x, st_pt_y };
 				double nb_iter_max = std::min(params.pfm_nb_iter_max,
 					(1.2*std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)*
 					std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)));
 				double *S;
 				cv::Mat D_mat;
-				fmm.fast_marching(trs, m_frangi_vesselness_tp1.cols, m_frangi_vesselness_tp1.rows, 
+				fmm.fast_marching(copy_frangi, m_frangi_vesselness_tp1.cols, m_frangi_vesselness_tp1.rows,
 					pfm_start_points, 1, pfm_end_points, 1, nb_iter_max,
 					&D_mat, &S);
 				std::vector<cv::Point> geo_path;
-				D_mat = D_mat.t();
 				fmm.compute_discrete_geodesic(D_mat, cv::Point(pfm_end_points[1], pfm_end_points[0]), &geo_path);
-
 
 				if (is_first) {
 					for (int a = geo_path.size()-1; a >= 0; a--)
@@ -1376,27 +1373,22 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 						break;
 				}
 
-
 				if (st_pt != cv::Point(-1, -1) && ed_pt != cv::Point(-1, -1) )
 				{
 					int st_pt_y = st_pt.y; int st_pt_x = st_pt.x;
 					int ed_pt_y = ed_pt.y; int ed_pt_x = ed_pt.x;
-					double pfm_end_points[] = { ed_pt_y, ed_pt_x };
-					double pfm_start_points[] = { st_pt_y, st_pt_x };
+					double pfm_end_points[] = { ed_pt_x, ed_pt_y };
+					double pfm_start_points[] = { st_pt_x, st_pt_y };
 					double nb_iter_max = std::min(params.pfm_nb_iter_max,
 						(1.2*std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)*
 						std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)));
 
 					double *S;
 					cv::Mat D_mat;
-					fmm.fast_marching(trs, m_frangi_vesselness_tp1.cols, m_frangi_vesselness_tp1.rows,
+					fmm.fast_marching(copy_frangi, m_frangi_vesselness_tp1.cols, m_frangi_vesselness_tp1.rows,
 						pfm_start_points, 1, pfm_end_points, 1, nb_iter_max,
 						&D_mat, &S);
-
-
 					std::vector<cv::Point> geo_path;
-
-					D_mat = D_mat.t();
 
 					fmm.compute_discrete_geodesic(D_mat, cv::Point(pfm_end_points[1], pfm_end_points[0]), &geo_path);
 
@@ -1404,10 +1396,7 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 					{
 						cum_seg_path.insert(cum_seg_path.begin(), geo_path[a]);
 					}
-
 				}
-
-
 			}
 			else if (st_pt == cv::Point(-1, -1))
 			{
@@ -1480,20 +1469,19 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 					int st_pt_y = st_pt.y; int st_pt_x = st_pt.x;
 					int ed_pt_y = ed_pt.y; int ed_pt_x = ed_pt.x;
 
-					double pfm_end_points[] = { ed_pt_y, ed_pt_x };
-					double pfm_start_points[] = { st_pt_y, st_pt_x };
+					double pfm_end_points[] = { ed_pt_x, ed_pt_y };
+					double pfm_start_points[] = { st_pt_x, st_pt_y };
 					double nb_iter_max = std::min(params.pfm_nb_iter_max,
 						(1.2*std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)*
 						std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)));
 
 					double *S;
 					cv::Mat D_mat;
-					fmm.fast_marching(trs, m_frangi_vesselness_tp1.cols, m_frangi_vesselness_tp1.rows,
+					fmm.fast_marching(copy_frangi, m_frangi_vesselness_tp1.cols, m_frangi_vesselness_tp1.rows,
 						pfm_start_points, 1, pfm_end_points, 1, nb_iter_max,
 						&D_mat, &S);
 
 					std::vector<cv::Point> geo_path;
-					D_mat = D_mat.t();
 
 					fmm.compute_discrete_geodesic(D_mat, cv::Point(pfm_end_points[1], pfm_end_points[0]), &geo_path);
 
@@ -1501,10 +1489,7 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 					{
 						cum_seg_path.insert(cum_seg_path.begin(), geo_path[a]);
 					}
-
 				}
-
-				
 			}
 			else if (ed_pt == cv::Point(-1, -1))
 			{
@@ -1580,33 +1565,27 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 					int ed_pt_y = ed_pt.y; int ed_pt_x = ed_pt.x;
 
 					// geodesic path
-					double pfm_end_points[] = { ed_pt_y, ed_pt_x };
-					double pfm_start_points[] = { st_pt_y, st_pt_x };
+					double pfm_end_points[] = { ed_pt_x, ed_pt_y };
+					double pfm_start_points[] = { st_pt_x, st_pt_y };
 					double nb_iter_max = std::min(params.pfm_nb_iter_max,
 						(1.2*std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)*
 						std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)));
 
 					double *S;
-
 					cv::Mat D_mat;
 
-					fmm.fast_marching(trs, m_frangi_vesselness_tp1.cols, m_frangi_vesselness_tp1.rows,
+					fmm.fast_marching(copy_frangi, m_frangi_vesselness_tp1.cols, m_frangi_vesselness_tp1.rows,
 						pfm_start_points, 1, pfm_end_points, 1, nb_iter_max,
 						&D_mat, &S);
 
-
 					std::vector<cv::Point> geo_path;
-
-					D_mat = D_mat.t();
 
 					fmm.compute_discrete_geodesic(D_mat, cv::Point(pfm_end_points[1], pfm_end_points[0]), &geo_path);
 
-
 					if (geo_path.size())
-					for (int a = geo_path.size() - 1; a >= 0; a--)
-						cum_seg_path.push_back(geo_path[a]);
+						for (int a = geo_path.size() - 1; a >= 0; a--)
+							cum_seg_path.push_back(geo_path[a]);
 				}
-
 			}
 		}
 
@@ -1661,23 +1640,19 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 
 				// geodesic path
 
-				double pfm_end_points[] = { ed_pt_y, ed_pt_x };
-				double pfm_start_points[] = { st_pt_y, st_pt_x };
-
+				double pfm_end_points[] = { ed_pt_x, ed_pt_y };
+				double pfm_start_points[] = { st_pt_x, st_pt_y };
 
 				double nb_iter_max = std::min(params.pfm_nb_iter_max, 1.2*std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)*std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols));
 
 				double *S;
 
 				cv::Mat D_mat;
-				fmm.fast_marching(trs, m_frangi_vesselness_tp1.cols, m_frangi_vesselness_tp1.rows,
+				fmm.fast_marching(copy_frangi, m_frangi_vesselness_tp1.cols, m_frangi_vesselness_tp1.rows,
 					pfm_start_points, 1, pfm_end_points, 1, nb_iter_max,
 					&D_mat, &S);
 
-
 				std::vector<cv::Point> geo_path;
-;
-				D_mat = D_mat.t();
 
 				fmm.compute_discrete_geodesic(D_mat, cv::Point(pfm_end_points[1], pfm_end_points[0]), &geo_path);
 
@@ -1906,11 +1881,10 @@ void cVCO::GrowVesselUsingFastMarching(cv::Mat ivessel, std::vector<cv::Point> l
 
 	std::vector<cv::Point> SourcePoint = lidx;
 
-	cv::Mat trs;
-	ivessel.copyTo(trs);
-	trs.convertTo(trs, CV_64FC1);
-	cv::transpose(trs, trs);
-	trs.setTo(1e-10, trs < 1e-10);
+	cv::Mat copy_frangi;
+	ivessel.copyTo(copy_frangi);
+	copy_frangi.convertTo(copy_frangi, CV_64FC1);
+	copy_frangi.setTo(1e-10, copy_frangi < 1e-10);
 
 	while (true)
 	{
@@ -1925,8 +1899,8 @@ void cVCO::GrowVesselUsingFastMarching(cv::Mat ivessel, std::vector<cv::Point> l
 		double* arrSourcePoint = new double[(int)SourcePoint.size() * 2];
 		for (int i = 0; i < SourcePoint.size(); i++)
 		{
-			arrSourcePoint[i * 2 + 0] = SourcePoint[i].y;
-			arrSourcePoint[i * 2 + 1] = SourcePoint[i].x;
+			arrSourcePoint[i * 2 + 0] = SourcePoint[i].x;
+			arrSourcePoint[i * 2 + 1] = SourcePoint[i].y;
 		}
 
 		cv::Mat tmp = cv::Mat::zeros(nY, nX, CV_8UC1);
@@ -1941,13 +1915,11 @@ void cVCO::GrowVesselUsingFastMarching(cv::Mat ivessel, std::vector<cv::Point> l
 		double dummyv;
 		maxDistancePoint(Y, Ibin, &StartPoint, &dummyv);
 
-		double endpt[2] = { StartPoint.y, StartPoint.x };
+		double endpt[2] = { StartPoint.x, StartPoint.y };
 		cv::Mat D_mat;
-		ffm.fast_marching(trs, ivessel.cols, ivessel.rows, arrSourcePoint, SourcePoint.size(), endpt, 1, nb_iter_max,
+		ffm.fast_marching(copy_frangi, ivessel.cols, ivessel.rows, arrSourcePoint, SourcePoint.size(), endpt, 1, nb_iter_max,
 			&D_mat, &S);
 
-		D_mat = D_mat.t();
-		//cv::transpose(D_mat, D_mat);
 		std::vector<cv::Point> ShortestLine;
 		ffm.compute_discrete_geodesic(D_mat, StartPoint, &ShortestLine);
 
@@ -1964,11 +1936,8 @@ void cVCO::GrowVesselUsingFastMarching(cv::Mat ivessel, std::vector<cv::Point> l
 		}
 
 		// Store the found branch skeleton
-
 		SkeletonSegments[itt] = ShortestLine;
-
 		itt = itt + 1;
-
 
 		// Add found branche to the list of fastmarching SourcePoints
 		for (int i = 0; i < ShortestLine.size(); i++)
