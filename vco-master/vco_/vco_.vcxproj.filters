@@ -84,6 +84,12 @@
     <ClInclude Include="GC\gcgraph.hpp">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="SegmTree.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Feature.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="TRW_S-v1.3\treeProbabilities.cpp">
@@ -129,6 +135,12 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="VesCL2Segm.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="SegmTree.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Feature.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>

@@ -1,4 +1,14 @@
 
+
+#include "std_include.h"
+#include "VCO.h"
+#include "GC/gcgraph.hpp"
+#include <limits>
+
+
+#define VERBOSE_COMP_VES_RADII
+
+
 /*
 Original OpenCV code grabcut.cpp modified by SCLEE, 20161228
 Modifications:
@@ -48,11 +58,6 @@ Modifications:
 // the use of this software, even if advised of the possibility of such damage.
 //
 //M*/
-#include "std_include.h"
-#include "VCO.h"
-#include "GC/gcgraph.hpp"
-#include <limits>
-
 
 /*
 This is implementation of image segmentation algorithm GrabCut described in
@@ -584,14 +589,15 @@ void grabCut_mod(cv::InputArray _img, cv::InputOutputArray _mask, cv::Rect rect,
 // - by Kyoungjin Noh, 201610
 //   method: get max response scale at each vessel centerline point from Frangi filtering results,
 //			 draw filled circles at the corresponding point with radius scale
-void MakeRegionMask_NKJ(std::vector<cv::Point> &vecPts, cv::Mat &frangiScale, 
+void MakeRegionMask_NKJ(
+	CVesSegm &vecPts, cv::Mat &frangiScale,
 	cv::Mat &mask, cv::Scalar col)
 {
 	cv::Mat convScale(1, vecPts.size(), CV_64FC1);
 	for (int k = 0; k < vecPts.size(); k++)
 	{
-		int cur_x = vecPts[k].x;
-		int cur_y = vecPts[k].y;
+		int cur_x = vecPts[k].pt.x;
+		int cur_y = vecPts[k].pt.y;
 		double s = frangiScale.at<double>(cur_y, cur_x);
 
 		convScale.at<double>(0, k) = s;
@@ -601,15 +607,27 @@ void MakeRegionMask_NKJ(std::vector<cv::Point> &vecPts, cv::Mat &frangiScale,
 
 	for (int k = 0; k < vecPts.size(); k++)
 	{
-		int cur_x = vecPts[k].x;
-		int cur_y = vecPts[k].y;
+		int cur_x = vecPts[k].pt.x;
+		int cur_y = vecPts[k].pt.y;
 		//test.at<uchar>(cur_y,cur_x*3+0)
 		//double s = FrangiScale[i + 1].at<double>(cur_y, cur_x);
-
 		cv::circle(mask, cv::Point(cur_x, cur_y), convScale.at<double>(0, k), col, -1);
 	}
 	convScale.release();
 }
+
+
+// generate vessel segmentation mask from vessel centerline points 
+// and estimated vessel radius
+// - by Soochahn Lee, 201701
+void MakeRegionMask_VesRadii(CVesSegm &vesSegm, cv::Mat &mask, cv::Scalar col)
+{
+	for (int k = 0; k < vesSegm.size(); k++)
+	{
+		cv::circle(mask, vesSegm[k].pt, vesSegm[k].rad, col, -1);
+	}
+}
+
 
 cv::Mat Convert2OnlyFGBG(cv::Mat &gcm, uchar BG, uchar FG)
 {
@@ -634,15 +652,16 @@ cv::Mat Convert2OnlyFGBG(cv::Mat &gcm, uchar BG, uchar FG)
 // - histograms are used to define appearance (unary) probabilities
 // - histograms defined by 
 //			 draw filled circles at the corresponding point with radius scale
-cv::Mat MakeRegionMask_GraphCut(std::vector<cv::Point> &vecPts,
+cv::Mat MakeRegionMask_GraphCut(
+	CVesSegm &vecPts,
 	cv::Mat &frangiScale,
-	cv::Mat &img, cv::Mat &mask,
+	cv::Mat &img, 
 	bool bPR_BGD_is_NarrowBand, int bgd_nb_sz, int fgd_nb_sz)
 {
-	int w = mask.rows;
-	int h = mask.cols;
+	int w = img.rows;
+	int h = img.cols;
 	// construct mask
-	cv::Mat gc_mask(mask.size(), CV_8UC1);
+	cv::Mat gc_mask(img.size(), CV_8UC1);
 	cv::Rect gc_roi;
 	// initialize to GC_BGD
 	gc_mask.setTo(cv::Scalar(cv::GC_BGD));
@@ -654,8 +673,7 @@ cv::Mat MakeRegionMask_GraphCut(std::vector<cv::Point> &vecPts,
 		cv::Mat v_pbg = cv::Mat::zeros(gc_mask.size(), CV_8UC1);
 		MakeRegionMask_NKJ(vecPts, frangiScale, v_pbg, cv::Scalar(cv::GC_PR_BGD));
 		cv::Mat se_bg = cv::getStructuringElement(cv::MORPH_ELLIPSE,
-			cv::Size(2 * bgd_nb_sz + 1, 2 * bgd_nb_sz + 1),
-			cv::Point(bgd_nb_sz, bgd_nb_sz));
+			cv::Size(2 * bgd_nb_sz + 1, 2 * bgd_nb_sz + 1));
 		cv::dilate(v_pbg, v_pbg, se_bg);
 		cv::Mat v_pfg = cv::Mat::zeros(gc_mask.size(), CV_8UC1);
 		MakeRegionMask_NKJ(vecPts, frangiScale, v_pfg, cv::Scalar(cv::GC_PR_FGD));
@@ -675,10 +693,10 @@ cv::Mat MakeRegionMask_GraphCut(std::vector<cv::Point> &vecPts,
 		minvx = minvy = INT_MAX;
 		maxvx = maxvy = INT_MIN;
 		for (int k = 0; k < vecPts.size(); k++) {
-			if (vecPts[k].x < minvx) minvx = vecPts[k].x;
-			if (vecPts[k].y < minvy) minvy = vecPts[k].y;
-			if (vecPts[k].x > maxvx) maxvx = vecPts[k].x;
-			if (vecPts[k].y > maxvy) maxvy = vecPts[k].y;
+			if (vecPts[k].pt.x < minvx) minvx = vecPts[k].pt.x;
+			if (vecPts[k].pt.y < minvy) minvy = vecPts[k].pt.y;
+			if (vecPts[k].pt.x > maxvx) maxvx = vecPts[k].pt.x;
+			if (vecPts[k].pt.y > maxvy) maxvy = vecPts[k].pt.y;
 		}
 		// add buffer for roi
 		int roi_buf = 10;
@@ -691,20 +709,211 @@ cv::Mat MakeRegionMask_GraphCut(std::vector<cv::Point> &vecPts,
 		gc_mask_roi.setTo(cv::Scalar(cv::GC_PR_BGD));
 		MakeRegionMask_NKJ(vecPts, frangiScale, gc_mask, cv::Scalar(cv::GC_PR_FGD));
 	}
-	
+	// set boundary as DEFINITELY_BGD
+	cv::line(gc_mask, cv::Point(0, 0), cv::Point(gc_mask.cols - 1, 0), cv::Scalar(cv::GC_BGD));
+	cv::line(gc_mask, cv::Point(0, 0), cv::Point(0, gc_mask.rows - 1), cv::Scalar(cv::GC_BGD));
+	cv::line(gc_mask, cv::Point(gc_mask.cols - 1, gc_mask.rows - 1), cv::Point(gc_mask.cols - 1, 0), cv::Scalar(cv::GC_BGD));
+	cv::line(gc_mask, cv::Point(gc_mask.cols - 1, gc_mask.rows - 1), cv::Point(0, gc_mask.rows - 1), cv::Scalar(cv::GC_BGD));
 	// set centerline points as DEFINITLY_FGD
 	for (int k = 0; k < vecPts.size(); k++)
-		gc_mask.at<char>(vecPts[k]) = cv::GC_FGD;
-	//cv::imshow("grabcut input mask", gc_mask*63);
-	//cv::imwrite("grabcut_input_mask.png", gc_mask * 63);
-	//printf("ROI: (%d, %d, %d, %d)", gc_roi.x, gc_roi.y, gc_roi.width, gc_roi.height);
+		gc_mask.at<char>(vecPts[k].pt) = cv::GC_FGD;
 
+#ifdef VERBOSE_COMP_VES_RADII
+	cv::imwrite("gc_seeds.png", gc_mask*60);
+#endif
 	cv::Mat bgdModel, fgdModel;
 	int iterCount = 1;
 	grabCut_mod(img, gc_mask, gc_roi, bgdModel, fgdModel, iterCount,
 		cv::GC_INIT_WITH_MASK);
-	//cv::imwrite("grabcut_vessel_extraction.png", gc_mask * 63);
-	//cv::imwrite("grabcut_input.png", gc_mask * 63);
 
 	return Convert2OnlyFGBG(gc_mask, 0, 255);
+}
+
+/*
+cv::Mat GetDCFromMaskBd(cv::Mat mask)
+{
+	// perform distance transform from mask 
+	// *** important that mask has non-zero values for inside vessel and zero for outside vessel
+	cv::Mat mask_dist;
+	cv::distanceTransform(mask, mask_dist, CV_DIST_L2, cv::DIST_MASK_PRECISE);
+
+	// determine ridges on computed DT, based on method from 
+	// http://haralick.org/journals/ridges_and_valleys.pdf
+	return cv::Mat();
+}
+
+void SmoothRegionMask(cv::Mat src, cv::Mat dst, int niter, int se_sz)
+{
+	cv::Mat se = cv::getStructuringElement(cv::MORPH_ELLIPSE,
+		cv::Size(se_sz * 2 + 1, se_sz * 2 + 1), cv::Point(se_sz, se_sz));
+	for (int i = 0; i < niter; i++)
+	{
+		cv::morphologyEx(src, dst, cv::MORPH_CLOSE, se);
+		cv::morphologyEx(src, dst, cv::MORPH_OPEN, se);
+	}
+}
+*/
+
+
+
+// compute vessel radius for all centerline points 
+// which automaticall defines the vessel segmentation mask
+//
+// - by Soochahn Lee, 201612
+// method: 
+// - initially compute vessel region mask from graph cut using centerline points as seed points
+// - apply thinning to computed region mask to get revised vessel centerline
+// - vessel radius at centerline point is defined from value of 
+//	 distance transform from region mask boundary
+// - compute vessel centerline normal vectors by very simple approximated differential
+// - vessel radii and normal vectors are stored within CVesSegm object
+void ComputeVesselRadii(
+	CVesSegm &vesSegm, // input (vessel centerline points) & output (radii)
+	cv::Mat &frangiScale,
+	cv::Mat &img, 
+	bool bPR_BGD_is_NarrowBand, int bgd_nb_sz, int fgd_nb_sz)
+{
+	if (!vesSegm.bCompRadii) {
+		// *** get vessel region mask *** //
+		cv::Mat gc_mask = MakeRegionMask_GraphCut(vesSegm, frangiScale, img,
+			bPR_BGD_is_NarrowBand, bgd_nb_sz, fgd_nb_sz);
+		// compute distance transform within vessel region
+		// *** important that mask has non-zero values for inside vessel and zero for outside vessel
+		cv::Mat mask_dist, mask_dist_64f;
+		cv::distanceTransform(gc_mask, mask_dist, CV_DIST_L2, cv::DIST_MASK_PRECISE);
+
+		// get shortest path, on distance transform of obtained region boundary
+		// update minimum values to avoid INF in FMM
+		mask_dist.convertTo(mask_dist_64f, CV_64FC1);
+		mask_dist_64f.setTo(1e-10, mask_dist_64f < 1e-10);
+		// set starting and ending points
+		cv::Point spt = vesSegm.front().pt;	// original start point
+		cv::Point ept = vesSegm.back().pt;	// original end point
+		double sptd[2]; sptd[0] = spt.x; sptd[1] = spt.y;
+		double eptd[2]; eptd[0] = ept.x; eptd[1] = ept.y;
+		double *S;
+		cv::Mat D_mat;
+		// perform fast-marching method on computed distance transform
+		cFastMarching fmm;
+		fmm.fast_marching(mask_dist_64f, mask_dist_64f.cols, mask_dist_64f.rows,
+			sptd, 1, eptd, 1, 1000000, &D_mat, &S);
+		// get shortest path
+		std::vector<cv::Point> geo_path;
+		fmm.compute_discrete_geodesic(D_mat, ept, &geo_path);
+		// store shortest path in ves_pts_ref
+		CVesSegm ves_pts_ref;
+		ves_pts_ref.init_from_ptarr_rev(geo_path);
+		// set vessel radii based on distance transform
+		ves_pts_ref.set_radii(mask_dist);
+		// smooth vessel radii
+		ves_pts_ref.smooth_radii(5, 3);
+#ifdef VERBOSE_COMP_VES_RADII
+		// for verification
+		cv::imwrite("gc_mask.png", gc_mask);
+		cv::imwrite("gc_mask_dist.png", mask_dist);
+		cv::Mat vsr_mask = cv::Mat::zeros(gc_mask.size(), CV_8UC3);
+		ves_pts_ref.draw2mask(vsr_mask, cv::Scalar(255, 255, 255));
+		cv::imwrite("vessegm_res_mask.png", vsr_mask);
+		cv::Mat vsr_line = cv::Mat::zeros(gc_mask.size(), CV_8UC3);
+		ves_pts_ref.drawline_8UC3(vsr_line, cv::Scalar(0, 0, 255));
+		vesSegm.drawline_8UC3(vsr_line, cv::Scalar(0, 255, 0));
+		cv::imwrite("vessegm_res_line.png", vsr_line);
+#endif
+		// store revised vessel contour
+		vesSegm.copyFrom(ves_pts_ref);
+	}
+	// compute normal vector for all centerline points
+	if (!vesSegm.bCompNormals)
+		vesSegm.compute_normals(5);
+#ifdef VERBOSE_COMP_VES_RADII
+	// for verification
+	cv::Mat vsr_mask = cv::Mat::zeros(img.size(), CV_8UC3);
+	vesSegm.draw_normals(vsr_mask, 5, 20, cv::Scalar(255, 255, 0), 1);
+	cv::imwrite("vessegm_nvecs.png", vsr_mask);
+#endif
+
+	/*
+	if (!vesSegm.bCompRadii) {
+		// *** get vessel region mask *** //
+		cv::Mat gc_mask = MakeRegionMask_GraphCut(vesSegm, frangiScale, img,
+			bPR_BGD_is_NarrowBand, bgd_nb_sz, fgd_nb_sz);
+		cv::imwrite("grabcut_vessel_extraction.png", gc_mask);
+
+
+		// *** get skeleton by morphological thinning *** //
+		cP2pMatching proc_obj;
+		cv::Mat thin_gc_mask;
+		proc_obj.thin(gc_mask, thin_gc_mask);
+
+		// *** refine vessel centerline based on vessel region segmentation 
+		//	   effectively some smoothing results from this refinement *** //
+		// first, construct vessel branch graph
+		std::vector<cv::Point> junc_pts, end_pts; // junc_pts: array of junction points, end_pts: array of end points
+		std::vector<std::vector<cv::Point>> vsegm2d; // vsegm2d: 2d array of all vessel segment points 
+		cv::Mat ftype_flag_arr; // ftype_flag_arr: flag array for all n_feat feature (junction+end) points, true for junction
+		cv::Mat vsegm_conn_mat;	// vsegm_conn_mat: n_segm * n_segm matrix representing connectivity between vessel segments
+		proc_obj.MakeGraphFromImage(thin_gc_mask, junc_pts, end_pts,
+			ftype_flag_arr, vsegm2d, vsegm_conn_mat);
+		// next, examine branches and end points
+		// if only 1 segment, use that segment directly
+		CVesSegm ves_pts_ref;
+		if (vsegm2d.size() == 1) {
+			ves_pts_ref.init_from_ptarr(vsegm2d[0]);
+		}
+		// if more than 1 segment, 
+		// extract single segment that starts and ends at (or close to) the original points
+		else {
+			// determine 2 end points that are closest to the original end points
+			cv::Point ept_s = vesSegm.front().pt;	// original start point 1
+			cv::Point ept_e = vesSegm.back().pt;		// original end point 1
+			cv::Point ept_s_ref, ept_e_ref;			// refined end points
+			// get points closest to original start and end points = refined start & end point
+			double dsmin = FLT_MAX, demin = FLT_MAX;
+			for (int i = 0; i < (int)end_pts.size(); i++) {
+				double ds = cv::norm(end_pts[i] - ept_s);
+				if (ds < dsmin) {
+					dsmin = ds;
+					ept_s_ref = end_pts[i];
+				}
+				double de = cv::norm(end_pts[i] - ept_e);
+				if (de < demin) {
+					demin = de;
+					ept_e_ref = end_pts[i];
+				}
+			}
+			// get shortest path, on current thinned mask, between two end points
+			cFastMarching fmm;
+			double s_pt[2]; s_pt[0] = ept_s_ref.x; s_pt[1] = ept_s_ref.y;
+			double e_pt[2]; e_pt[0] = ept_e_ref.x; e_pt[1] = ept_e_ref.y;
+			double *S;
+			cv::Mat D_mat, thin_gc_mask_64f;
+			thin_gc_mask.convertTo(thin_gc_mask_64f, CV_64FC1, 1.0 / 255.0);
+			// *must dilate thin path because FMM is 4-neighbor based
+			for (int n = 0; n < (int)vsegm2d.size(); n++)
+			for (int i = 0; i < (int)vsegm2d[n].size(); i++)
+				cv::circle(thin_gc_mask_64f, vsegm2d[n][i], 3, cv::Scalar(1.0), -1);
+			// update minimum values to avoid INF in FMM
+			thin_gc_mask_64f.setTo(1e-10, thin_gc_mask_64f < 1e-10);
+			// perform fast-marching method
+			fmm.fast_marching(thin_gc_mask_64f, thin_gc_mask.cols, thin_gc_mask.rows,
+				s_pt, 1, e_pt, 1, 1000000, &D_mat, &S);
+			// get shortest path
+			std::vector<cv::Point> geo_path;
+			fmm.compute_discrete_geodesic(D_mat, ept_e_ref, &geo_path);
+			// store shortest path in ves_pts_ref
+			ves_pts_ref.init_from_ptarr_rev(geo_path);
+		}
+		// determine vessel radii based on distance transform
+		// *** important that mask has non-zero values for inside vessel and zero for outside vessel
+		cv::Mat mask_dist;
+		cv::distanceTransform(gc_mask, mask_dist, CV_DIST_L2, cv::DIST_MASK_PRECISE);
+		ves_pts_ref.set_radii(mask_dist);
+		// smooth vessel radii
+		ves_pts_ref.smooth_radii(5, 3);
+		vesSegm.copyFrom(ves_pts_ref);
+	}
+	// compute normal vector for all centerline points
+	if (!vesSegm.bCompNormals)
+		vesSegm.compute_normals(5);
+	*/
 }

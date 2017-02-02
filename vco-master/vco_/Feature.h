@@ -1,10 +1,11 @@
 #pragma once
 
-#include "stdafx.h"
+#include "std_include.h"
+#include "SegmTree.h"
 
-struct featureInfo
+struct VCO_EXPORTS featureInfo
 {
-	cv::Point sp ;
+	cv::Point sp;
 	cv::Point ep;
 
 	// point type, 0= end(non junction point) and 1= junction
@@ -12,7 +13,7 @@ struct featureInfo
 	int epType;
 };
 
-class CFeatureTree
+class VCO_EXPORTS CFeatureTree
 {
 public:
 	CFeatureTree();
@@ -30,5 +31,6 @@ public:
 	featureInfo get(int i);
 	void insert(int i, featureInfo feat);
 	
+	void init(CSegmTree &SegmTree, std::vector<cv::Point> &J);
 };
 

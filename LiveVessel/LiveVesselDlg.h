@@ -16,8 +16,8 @@
 
 #include "../vco-master/vco_/VCO.h"
 
-#include "SegmTree.h"
-#include "Feature.h"
+#include "../vco-master/vco_/SegmTree.h"
+#include "../vco-master/vco_/Feature.h"
 
 #ifdef _DEBUG
 #pragma comment(lib,"vco64d.lib")
@@ -45,26 +45,25 @@ enum ThreadWorkingType
 };
 
 
+std::string ChangeFilenameExtension(std::string frm_path, std::string ext);
+std::string GetFileExtension(std::string path);
+std::string RemoveAndAppendFilepath(std::string path, std::string app);
 
-// CLiveVesselDlg 대화 상자
+
 class CLiveVesselDlg : public CDialogEx
 {
-// 생성입니다.
-public:
-	CLiveVesselDlg(CWnd* pParent = NULL);	// 표준 생성자입니다.
 
-// 대화 상자 데이터입니다.
+public:
+	CLiveVesselDlg(CWnd* pParent = NULL);	
+
 	enum { IDD = IDD_LIVEVESSEL_DIALOG };
 
 	protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 지원입니다.
 
-
-// 구현입니다.
 protected:
 	HICON m_hIcon;
 
-	// 생성된 메시지 맵 함수
 	virtual BOOL OnInitDialog();
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 	afx_msg void OnPaint();
@@ -73,6 +72,7 @@ protected:
 public:
 	//std::vector<cv::Mat> vesselImg;
 	cv::Mat vesselImg;
+	cv::Mat vesselImgG;
 	//cv::Mat vesselImg;
 	cv::Mat m_zoomImg;
 	cv::Mat m_disp_tmp;
@@ -92,7 +92,6 @@ public:
 	std::vector<std::vector<cv::Point>> bivecPointsOfLine;
 	std::vector<cv::Point> vecPoints;
 	//std::vector<std::vector<cv::Point>> *SegmTree;
-	//CSegmTree &SegmTree;
 	CSegmTree SegmTree;
 	std::vector<std::vector<cv::Point>> vecSpEpLists_Zoom;
 	std::vector<cv::Point> m_vecPtZoom;
@@ -133,7 +132,6 @@ public:
 	virtual BOOL PreTranslateMessage(MSG* pMsg);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
-	afx_msg void OnBnClickedButtonLoad();
 	afx_msg void OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags);
 	afx_msg void OnSetFocus(CWnd* pOldWnd);
 	afx_msg void OnBnClickedButtonZoom();
@@ -182,7 +180,6 @@ public:
 	int m_width;
 	int m_height;
 	void updateSegm();
-	void updateSegm(int n);
 
 	featureInfo oldFeat;
 	///////////////////////
@@ -208,8 +205,7 @@ public:
 	cv::Mat FeatrueImg;
 	cv::Mat SegLabelImg;
 
-
-
+	// message map
 	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
 	afx_msg void OnRButtonDown(UINT nFlags, CPoint point);
 	afx_msg void OnRButtonUp(UINT nFlags, CPoint point);
@@ -240,13 +236,28 @@ public:
 	afx_msg void OnClose();
 
 	//2016.12.21_daseul _UNDO&REDO
-	std::vector<std::vector<cv::Point> > m_tmpLine;
+	//std::vector<std::vector<cv::Point> > m_tmpLine;
+	std::vector<CVesSegm> m_tmpLine;
 	//int iDraw_path_sliderPos;
 	void ReDrawMask();
 
 
 	// 2016.12.29 SCLEE - CLEAN CODE
-	void SaveVesCenterlineMask2File(int cur_frame);
-	void SaveVesCenterlineCoord2File(int cur_frame);
-	void SaveVesSegmentationMask2File(int cur_frame);
+	void SaveVesCenterlineMask(std::string str);
+	afx_msg void OnBnClickedButtonConvertData();
+	// ADDITIONAL 2017.01.25
+	void OpenEndedFMM(); 
+	bool LoadFrangi(std::string ffPath);
+	void SaveFrangi(std::string ffpath);
+	bool LoadVesselCenterlineInfo(std::string vsc_fn);
+	void SaveVesselCenterlineInfo(std::string vsc_fn);
+	bool LoadVesselCenterlinePoints(std::string vsc_fn);
+	void SaveVesselCenterlinePoints(std::string vsc_fn);
+	void SaveVesselCenterlinePoints(std::string vsc_fn,
+		std::vector<std::vector<cv::Point>> &segm_tree);
+	void FindFilesInDir(CString dir, CString ext, std::vector<std::string> &path_list);
+	// 2017.01.09 SCLEE - CONSTRUCT CSV FILE
+	void ConvertPerFrameData(CString dir);
+	void ConstructSeqCSVDataFile(CString dir);
+
 };
