@@ -7,6 +7,7 @@
 #include "Geodesic.h"
 #include "VCOParams.h"
 #include "P2pMatching.h"
+#include "SegmTree.h"
 
 #include <cstdlib>
 #include <stdio.h>
@@ -80,6 +81,18 @@ public:
 	// get unsigned char pointer mask form of vessel centerline, before post processing
 	unsigned char* get_p_tp1_mask_pp_8u();
 
+
+	// SOON TO BE DEPRECATED - SCLEE 2017.01.25
+	// VERY VERY POORLY WRITTEN CODE !!!!!!!!
+	// cv::Mat get_tp1_adjusted_vescl_mask_pp: 
+	//	FUNCTION: to clean up vessel centerline results from VCO
+	//  DETAILS: 
+	//		- perform morphological dilation / thining to 
+	//		  connect slightly disconnected components, smooth centerline
+	//		- perform connected component analysis to leave only largest component
+	//		- get vessel tree graph from mask, 
+	//		- find and remove leaf branches with size smaller than threshold
+	//		- remake mask from the branches that remain
 	cv::Mat get_tp1_adjusted_vescl_mask_pp();
 
 	// coded by kjNoh (20160809)
@@ -108,7 +121,14 @@ public:
 	// coded by kjNoh (20160809)
 	// get vessel segment vector points 2d array of pre-post processing
 	std::vector<std::vector<cv::Point>> getVsegVpts2dArr();
+
+	// SOON TO BE DEPRECATED - SCLEE 2017.01.25
+	// BASICALLY EMPTY FUNCTION 
+	// DOES NOTHING BUT CALL get_tp1_adjusted_vescl_mask_pp and MakeGraphFromImage
 	// get vessel segment vector points 2d array of post-post processing
+	//  input: vessel centerline mask, 
+	//	- run MakeGraphFromImage to get graph structure (junction-end points) 
+	//	output: structure E, end points End, junction points Junction
 	std::vector<std::vector<cv::Point>> getVsegVpts2dArr_pp();
 
 	// coded by kjNoh (20160809)
@@ -404,3 +424,62 @@ private:
 	// ***** END OF INTERNAL FUNCTIONS ***** //
 };
 
+// ADDED: SCLEE 20161227
+void VCO_EXPORTS grabCut_mod(cv::InputArray _img, cv::InputOutputArray _mask, cv::Rect rect,
+	cv::InputOutputArray _bgdModel, cv::InputOutputArray _fgdModel,
+	int iterCount, int mode, int nGMMcc=3, double lambda=100, double u_max=1000);
+
+// generate vessel segmentation mask from vessel centerline points 
+// using Frangi max response scales
+// - by Kyoungjin Noh, 201610
+//   method: get max response scale at each vessel centerline point from Frangi filtering results,
+//			 draw filled circles at the corresponding point with radius scale
+void VCO_EXPORTS MakeRegionMask_NKJ(
+	CVesSegm &vecPts,
+	cv::Mat &frangiScale,
+	cv::Mat &mask, cv::Scalar col = cv::Scalar(255));
+
+// generate vessel segmentation mask from vessel centerline points 
+// using graph cuts
+// - by Soochahn Lee, 201612
+// method: 
+// - centerline points are seed points
+// - histograms are used to define appearance (unary) probabilities
+// - histograms defined by 
+//			 draw filled circles at the corresponding point with radius scale
+cv::Mat VCO_EXPORTS MakeRegionMask_GraphCut(
+	CVesSegm &vecPts,
+	cv::Mat &frangiScale,
+	cv::Mat &img, 
+	bool bPR_BGD_is_NarrowBand = true, int bgd_nb_sz = 10, int fgd_nb_sz = 2);
+
+// generate vessel segmentation mask from vessel centerline points 
+// and estimated vessel radius
+// - by Soochahn Lee, 201701
+void VCO_EXPORTS MakeRegionMask_VesRadii(
+	CVesSegm &vesSegm, 
+	cv::Mat &mask, 
+	cv::Scalar col = cv::Scalar(255));
+
+//////////
+/*
+   void ComputeVesselRadii(
+	   std::vector<CVesSegmPt> &vecPts,
+	   cv::Mat &frangiScale,
+	   cv::Mat &img, cv::Mat &mask,
+	   bool bPR_BGD_is_NarrowBand = true, int bgd_nb_sz = 10, int fgd_nb_sz = 2);
+   Compute vessel radius for all vessel centerline points by
+   1. use Frangi vesselness-scale data to construct initial estimation of region
+   2. use initial region estimation to construct graph cut seed region mask, 
+      compute graph cut segmentation
+   3. from graph cut segmentation mask, 
+      a) perform morphological smoothing
+      a) determine radius for each vessel centerline
+	  b) refine centerline point position based on computed radius
+*/
+void VCO_EXPORTS ComputeVesselRadii(
+	CVesSegm &vesSegm,
+	cv::Mat &frangiScale,
+	cv::Mat &img, 
+	bool bPR_BGD_is_NarrowBand = true, int bgd_nb_sz = 10, int fgd_nb_sz = 2);
+// END: SCLEE 20161227

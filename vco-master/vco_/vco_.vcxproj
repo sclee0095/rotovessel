@@ -74,10 +74,10 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>E:\500_LIB\OpenCV\opencv 3.1.0\build\include;$(IncludePath)</IncludePath>
+    <IncludePath>E:\0500_LIB\OpenCV\opencv-3.1\build\include;$(IncludePath)</IncludePath>
     <TargetName>vco64d</TargetName>
-    <OutDir>$(SolutionDir)\bin\</OutDir>
-    <LibraryPath>E:\500_LIB\OpenCV\opencv 3.1.0\build\x64\vc12\lib;$(LibraryPath)</LibraryPath>
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
+    <LibraryPath>E:\0500_LIB\OpenCV\opencv-3.1\build\x64\vc12\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -87,10 +87,10 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>E:\500_LIB\OpenCV\opencv 3.1.0\build\include;$(IncludePath)</IncludePath>
+    <IncludePath>E:\0500_LIB\OpenCV\opencv-3.1\build\include;$(IncludePath)</IncludePath>
     <TargetName>vco64</TargetName>
-    <OutDir>$(SolutionDir)\bin\</OutDir>
-    <LibraryPath>E:\500_LIB\OpenCV\opencv 3.1.0\build\x64\vc12\lib;$(LibraryPath)</LibraryPath>
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
+    <LibraryPath>E:\0500_LIB\OpenCV\opencv-3.1\build\x64\vc12\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -161,12 +161,14 @@
   <ItemGroup>
     <ClInclude Include="ChamferMatching.h" />
     <ClInclude Include="FastMarching.h" />
+    <ClInclude Include="Feature.h" />
     <ClInclude Include="FrangiFilter.h" />
+    <ClInclude Include="GC\gcgraph.hpp" />
     <ClInclude Include="Geodesic.h" />
+    <ClInclude Include="SegmTree.h" />
     <ClInclude Include="VCO.h" />
     <ClInclude Include="P2pMatching.h" />
     <ClInclude Include="frangi\frangi.h" />
-    <ClInclude Include="make_dll.h" />
     <ClInclude Include="std_include.h" />
     <ClInclude Include="TRW_S-v1.3\instances.h" />
     <ClInclude Include="TRW_S-v1.3\MRFEnergy.h" />
@@ -183,8 +185,10 @@
   <ItemGroup>
     <ClCompile Include="ChamferMatching.cpp" />
     <ClCompile Include="FastMarching.cpp" />
+    <ClCompile Include="Feature.cpp" />
     <ClCompile Include="FrangiFilter.cpp" />
     <ClCompile Include="Geodesic.cpp" />
+    <ClCompile Include="SegmTree.cpp" />
     <ClCompile Include="VCO.cpp" />
     <ClCompile Include="P2pMatching.cpp" />
     <ClCompile Include="fast_marching2\fheap\fib.cpp" />
@@ -195,6 +199,7 @@
     <ClCompile Include="TRW_S-v1.3\ordering.cpp" />
     <ClCompile Include="TRW_S-v1.3\treeProbabilities.cpp" />
     <ClCompile Include="VCOParams.cpp" />
+    <ClCompile Include="VesCL2Segm.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

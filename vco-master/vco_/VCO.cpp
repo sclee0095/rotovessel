@@ -2,23 +2,9 @@
 
 
 #include "VCO.h"
-//#include <vld.h> 
-#if !defined(_AFXDLL)
-#include <windows.h>
-#include <crtdbg.h>
-#if defined(DEBUG) | defined(_DEBUG)
-#if !defined(DEBUG_NEW)
-#define DEBUG_NEW new(_CLIENT_BLOCK, __FILE__, __LINE__)
-#define new DEBUG_NEW
-#endif
-#endif
-#endif
 
 typedef int mwSize;
 typedef int mwIndex;
-
-
-
 
 cVCO::cVCO(cv::Mat frm_t, cv::Mat frm_vc_t,
 	cv::Mat frm_tp1, int ftpidx,
@@ -840,33 +826,14 @@ void cVCO::VesselCorrespondenceOptimization(
 	int nY = img_t.rows;
 	int nX = img_t.cols;
 
-
 	// *** perform Frangi filtering for t+1-frame *** //
-	//cv::Mat img_tp1(img_h, img_w, CV_64FC1, arr_img_tp1);
 	cv::Mat img_tp1;
 	arr_img_tp1.copyTo(img_tp1);
-	//img_tp1.convertTo(img_tp1, CV_8UC1);
-
 
 	cFrangiFilter frangi;
 	cv::Mat tmp_frangi_vesselness_tp1;
 	cv::Mat fangiSacle;
 	m_frangi_vesselness_tp1 = frangi.frangi(img_tp1, &fangiSacle);
-
-	cv::Mat thr_frangi = m_frangi_vesselness_tp1 >= 0.01;
-	cP2pMatching p2p(18);
-	cv::Mat thing_img;
-	p2p.thin(thr_frangi, thing_img);
-
-	cv::Mat draw;
-	if (img_tp1.channels() == 1)
-		cv::cvtColor(img_tp1, draw, CV_GRAY2BGR);
-	else
-		img_tp1.copyTo(draw);
-
-	draw.setTo(cv::Scalar(255, 0, 0), thing_img);
-
-	cv::imwrite("draw.png", draw);
 	
 	m_p_frangi_vesselness_tp1 = new float[m_frangi_vesselness_tp1.rows*m_frangi_vesselness_tp1.cols];
 	for (int y = 0; y < m_frangi_vesselness_tp1.rows; y++)
@@ -874,19 +841,13 @@ void cVCO::VesselCorrespondenceOptimization(
 	{
 		m_p_frangi_vesselness_tp1[y*m_frangi_vesselness_tp1.cols + x] = m_frangi_vesselness_tp1.at<float>(y, x);
 	}
-	//m_p_frangi_vesselness_tp1 = ((float*)m_frangi_vesselness_tp1.data);
-
 	// *** END Frangi filtering *** //
 
 	// *** generate binary centerline images for t-frame and t+1-frame*** //
-
-
-	//cP2pMatching p2p(18);
+	cP2pMatching p2p(18);
 	// binary img of 't' frame
-	//cv::Mat bimg_t(img_h, img_w, CV_64FC1, arr_bimg_t);
 	cv::Mat bimg_t;
 	arr_bimg_t.copyTo(bimg_t);
-	//bimg_t.convertTo(bimg_t, CV_8UC1);
 	p2p.thin(bimg_t, bimg_t);
 	// binary img of 't+1' frame
 	cv::Mat bimg_tp1;
@@ -905,21 +866,17 @@ void cVCO::VesselCorrespondenceOptimization(
 		gc_bimg_t, gc_t_x, gc_t_y);
 	// *** END of global chamfer matching *** //
 
-	
-
 	// *** point correspondence candidate searching *** //
 	std::vector<std::vector<cv::Point>> v_segm_pt_coors;
 	std::vector<cv::Mat> v_segm_pt_cands;
 	std::vector<cv::Mat> v_segm_pt_cands_d;
 	std::vector<cv::Point> J, end;
-	//cv::Mat bJ;
+
 	p2p.thin(gc_bimg_t, gc_bimg_t);
 	p2p.run(img_t, img_tp1, gc_bimg_t, params, gc_t_x, gc_t_y, m_frangi_vesselness_tp1,
 		fidx_tp1, savePath, bVerbose, &v_segm_pt_coors, &v_segm_pt_cands, &v_segm_pt_cands_d, &J, &end);
 
 	m_t_feat_pts = setVesFeatPts(J, end, cv::Point(gc_t_x, gc_t_y));
-
-
 	m_t_vpt_arr = makeSegvec2Allvec(v_segm_pt_coors,cv::Point(gc_t_x,gc_t_y));
 
 	// * number of vessel segments
@@ -1041,13 +998,10 @@ void cVCO::VesselCorrespondenceOptimization(
 	MakeConnectedCenterlineFromSubsampledPts(m_frangi_vesselness_tp1,v_segm_to_all_coors,all_cands,all_joining_seg,labels,ves_segm_num,num_all_joining_seg,
 		&newE, &all_v, &all_vessel_pt, &vpts_all_subsample, &vpts_seg_subsample);
 
-
 	// stored tp1 feature points
 	m_tp1_feat_pts = find_tp1_features(m_t_feat_pts,
 		m_t_vpt_arr,
 		vpts_all_subsample);
-
-
 
 	//stored previous segment vector 
 	m_tp1_vsegm_vpt_2darr = newE;
@@ -1065,7 +1019,6 @@ void cVCO::VesselCorrespondenceOptimization(
 		cv::imwrite(str, drawDisplacemete);
 	}
 		
-
 	cv::Mat draw_bimg_tp1(nY, nX, CV_8UC1);
 	draw_bimg_tp1 = 0;
 
@@ -1097,15 +1050,11 @@ void cVCO::VesselCorrespondenceOptimization(
 		cv::imwrite(str, final_canvas_img);
 	}
 
-
-
 	///////////// post - processing///////////////
 	if (bPostProc)
 		postProcGrowVessel(img_tp1, m_frangi_vesselness_tp1, all_vessel_pt, params, &newE, m_tp1_feat_pts);
 
 	m_tp1_vsegm_vpt_2darr_pp = newE;
-
-
 	m_tp1_vsegm_linked_information = linkedSeg(newE);
 
 	if (bVerbose)
@@ -1258,19 +1207,13 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 				double nb_iter_max = std::min(params.pfm_nb_iter_max,
 					(1.2*std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)*
 					std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)));
-
-				double *D, *S;
-
+				double *S;
 				cv::Mat D_mat;
 				fmm.fast_marching(trs, m_frangi_vesselness_tp1.cols, m_frangi_vesselness_tp1.rows, 
 					pfm_start_points, 1, pfm_end_points, 1, nb_iter_max,
 					&D_mat, &S);
-
-
 				std::vector<cv::Point> geo_path;
-				
 				D_mat = D_mat.t();
-
 				fmm.compute_discrete_geodesic(D_mat, cv::Point(pfm_end_points[1], pfm_end_points[0]), &geo_path);
 
 
@@ -1444,7 +1387,7 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 						(1.2*std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)*
 						std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)));
 
-					double *D, *S;
+					double *S;
 					cv::Mat D_mat;
 					fmm.fast_marching(trs, m_frangi_vesselness_tp1.cols, m_frangi_vesselness_tp1.rows,
 						pfm_start_points, 1, pfm_end_points, 1, nb_iter_max,
@@ -1456,8 +1399,6 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 					D_mat = D_mat.t();
 
 					fmm.compute_discrete_geodesic(D_mat, cv::Point(pfm_end_points[1], pfm_end_points[0]), &geo_path);
-
-
 
 					for (int a = 0; a < geo_path.size(); a++)
 					{
@@ -1545,7 +1486,7 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 						(1.2*std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)*
 						std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)));
 
-					double *D, *S;
+					double *S;
 					cv::Mat D_mat;
 					fmm.fast_marching(trs, m_frangi_vesselness_tp1.cols, m_frangi_vesselness_tp1.rows,
 						pfm_start_points, 1, pfm_end_points, 1, nb_iter_max,
@@ -1645,7 +1586,7 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 						(1.2*std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)*
 						std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)));
 
-					double *D, *S;
+					double *S;
 
 					cv::Mat D_mat;
 
@@ -1664,39 +1605,11 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 					if (geo_path.size())
 					for (int a = geo_path.size() - 1; a >= 0; a--)
 						cum_seg_path.push_back(geo_path[a]);
-
-
 				}
 
 			}
 		}
 
-		//// kjNoh 161206
-		//int nPts = (int)cum_seg_path.size();
-		//cv::Mat gauss_x(1, nPts, CV_64FC1);
-		//cv::Mat gauss_y(1, nPts, CV_64FC1);
-		//gauss_x = 0;
-		//gauss_y = 0;
-		//for (int k = 0; k < nPts; k++)
-		//{
-		//	gauss_x.at<double>(0, k) = cum_seg_path[k].x;
-		//	gauss_y.at<double>(0, k) = cum_seg_path[k].y;
-		//}
-		//	
-
-		//cv::GaussianBlur(gauss_x, gauss_x, cv::Size(10, 1), 5);
-		//cv::GaussianBlur(gauss_y, gauss_y, cv::Size(10, 1), 5);
-
-		//cum_seg_path.clear();
-
-		//
-		//// kjNoh 161206
-		//// set to weited frangi filter about new path 
-		//for (int k = 0; k < nPts; k++)
-		//{
-		//	cum_seg_path.push_back(cv::Point(std::floor(gauss_x.at<double>(0, k) + 0.5f), std::floor(gauss_y.at<double>(0, k)+0.5f)));
-		//	trs.at<double>(cum_seg_path[k]) = 1;
-		//}
 
 		newE->push_back(cum_seg_path);
 		for (int k = 0; k < temp_vpts.size(); k++)
@@ -1763,7 +1676,7 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 
 
 				std::vector<cv::Point> geo_path;
-
+;
 				D_mat = D_mat.t();
 
 				fmm.compute_discrete_geodesic(D_mat, cv::Point(pfm_end_points[1], pfm_end_points[0]), &geo_path);
@@ -1778,11 +1691,6 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 		{
 			continue;
 		}
-
-		// kjNoh 161206
-		// set to weited frangi filter about new path 
-		for (int k = 0; k < cum_path.size(); k++)
-			trs.at<double>(cum_path[k]) = 1;
 
 		for (int k = 0; k < cum_path.size(); k++)
 			all_vessel_pt->push_back(cum_path[k]);
@@ -1816,14 +1724,14 @@ cv::Mat cVCO::postProcGrowVessel(cv::Mat img_tp1, cv::Mat m_frangi_vesselness_tp
 
 	if (feat.empty())
 	{
-		GrowVesselUsingFastMarching(m_frangi_vesselness_tp1, all_vessel_pt, params.thre_ivessel,
-			params, &new_bimg, &new_lidx, &app_lidx);
+	GrowVesselUsingFastMarching(m_frangi_vesselness_tp1, all_vessel_pt, params.thre_ivessel,
+		params, &new_bimg, &new_lidx, &app_lidx);
 	}
 	else
 	{
 		GrowVesselUsingRegionGrowing(img_tp1, m_frangi_vesselness_tp1, *E, feat, 0.01f, params, &new_bimg, &app_lidx);
 	}
-	
+
 
 	cv::Mat img_add_seg(new_bimg.rows, new_bimg.cols, CV_8UC1);
 	img_add_seg = 0;
@@ -1838,23 +1746,17 @@ cv::Mat cVCO::postProcGrowVessel(cv::Mat img_tp1, cv::Mat m_frangi_vesselness_tp
 			img_add_seg.at<uchar>(app_lidx[i].y, app_lidx[i].x) = 255;
 
 	}
-
 	img_add_seg.setTo(0,exclude==255);
 
 	cP2pMatching p2p;
-
 	p2p.thin(img_add_seg, img_add_seg);
 
 	cv::Mat CCA;
 	int nCCA = cv::connectedComponents(img_add_seg, CCA);
 
 	std::vector<std::vector<cv::Point>> add_pts;
-
 	std::vector<cv::Mat> added_seg_lists;
-
 	std::vector<std::vector<cv::Point>> tmpE;
-
-
 	for (int i = 1; i < nCCA; i++)
 	{
 		cv::Mat cur_CCA = CCA == i;
@@ -1868,7 +1770,6 @@ cv::Mat cVCO::postProcGrowVessel(cv::Mat img_tp1, cv::Mat m_frangi_vesselness_tp
 		cv::Mat map, bJ;
 		p2p.MakeGraphFromImage(cur_CCA, J, end, bJ, added_E, map);
 
-		
 		for (int j = 0; j < added_E.size(); j++)
 		{
 			cv::Mat seg_img(img_h,img_w,CV_8UC1);
@@ -1882,10 +1783,7 @@ cv::Mat cVCO::postProcGrowVessel(cv::Mat img_tp1, cv::Mat m_frangi_vesselness_tp
 			tmpE.push_back(added_E[j]);
 		}
 	}
-
 	add_pts = tmpE;
-
-
 
 	for (int i = 0; i < add_pts.size(); i++)
 		(*E).push_back(add_pts[i]);
@@ -1899,9 +1797,7 @@ cv::Mat cVCO::postProcGrowVessel(cv::Mat img_tp1, cv::Mat m_frangi_vesselness_tp
 		tp1_pp_vscl_mask.at<uchar>((*E)[i][j].y, (*E)[i][j].x) = 255;
 	}
 
-
 	char str[100];
-
 	if (bVerbose)
 	{
 		cv::Mat final_canvas_img;
@@ -1916,7 +1812,6 @@ cv::Mat cVCO::postProcGrowVessel(cv::Mat img_tp1, cv::Mat m_frangi_vesselness_tp
 	}
 
 	return tp1_pp_vscl_mask;
-
 }
 
 void cVCO::GrowVesselUsingFastMarching(cv::Mat ivessel, std::vector<cv::Point> lidx, double thre, cVCOParams p,
@@ -1933,14 +1828,12 @@ void cVCO::GrowVesselUsingFastMarching(cv::Mat ivessel, std::vector<cv::Point> l
 	//%
 	//% new_bimg : binary mask for a new vessel
 	//% new_lidx : linear indices for a new vessels
-	//% app_lidx : linear indices of appened parts
+	//% app_lidx : linear indices of appended parts
 	//%
 	//% coded by syshin(160305)
 	//% converted by kjNoh(160600)
 
-
 	cFastMarching ffm;
-
 
 	bool verbose = false;
 	bool IS3D = false;
@@ -1948,18 +1841,19 @@ void cVCO::GrowVesselUsingFastMarching(cv::Mat ivessel, std::vector<cv::Point> l
 	int nY = ivessel.rows;
 	int nX = ivessel.cols;
 
-	// Convert double image to logical
+	// binary thresholding of vessel prob input
 	cv::Mat Ibin = ivessel >= thre;
 	
+	// get connected components (CC) of binary threshold results
 	cv::Mat CC;
 	int numCC = cv::connectedComponents(Ibin, CC);
 
 	cv::Mat bROI = cv::Mat::zeros(numCC + 1, 1, CV_64FC1);
 	Ibin = cv::Mat::zeros(nY, nX, CV_8UC1);
 	
+	// for each CC
 	for (int i = 0; i <= numCC; i++)
 	{
-
 		cv::Mat curCC = CC == (i + 1);
 		std::vector<cv::Point> cc_idx;
 		cv::findNonZero(curCC, cc_idx);
@@ -1992,13 +1886,13 @@ void cVCO::GrowVesselUsingFastMarching(cv::Mat ivessel, std::vector<cv::Point> l
 
 	// Distance to vessel boundary
 	cv::Mat BoundaryDistance;
-	getBoundaryDistance(Ibin, IS3D, &BoundaryDistance);
+	getBoundaryDistance(Ibin, &BoundaryDistance);
 
 	// Get maximum distance value, which is used as starting point of the
 	// first skeleton branch
 	double maxD;
 	cv::Point dummy_pt;
-	maxDistancePoint(BoundaryDistance, Ibin, IS3D, &dummy_pt, &maxD);
+	maxDistancePoint(BoundaryDistance, Ibin, &dummy_pt, &maxD);
 
 	//// Make a fastmarching speed image from the distance image
 	//SpeedImage = (BoundaryDistance / maxD). ^ 4;
@@ -2018,17 +1912,15 @@ void cVCO::GrowVesselUsingFastMarching(cv::Mat ivessel, std::vector<cv::Point> l
 	cv::transpose(trs, trs);
 	trs.setTo(1e-10, trs < 1e-10);
 
-
 	while (true)
 	{
 
 		// Do fast marching using the maximum distance value in the image
 		// and the points describing all found branches are sourcepoints.
-		double nb_iter_max = std::min(p.pfm_nb_iter_max, 1.2*std::max(ivessel.rows, ivessel.cols)*std::max(ivessel.rows, ivessel.cols));
+		double nb_iter_max = std::min(p.pfm_nb_iter_max, 
+			1.2*std::max(ivessel.rows, ivessel.cols)*std::max(ivessel.rows, ivessel.cols));
 
 		double *D, *S;
-
-
 
 		double* arrSourcePoint = new double[(int)SourcePoint.size() * 2];
 		for (int i = 0; i < SourcePoint.size(); i++)
@@ -2041,22 +1933,19 @@ void cVCO::GrowVesselUsingFastMarching(cv::Mat ivessel, std::vector<cv::Point> l
 		for (int i = 0; i < SourcePoint.size(); i++)
 			tmp.at<uchar>(SourcePoint[i]) = 255;
 
-
 		cv::Mat Y;
 		cv::distanceTransform(~tmp, Y, cv::DistanceTypes::DIST_L2, cv::DistanceTransformMasks::DIST_MASK_3, CV_32FC1);
 
 		// Trace a branch back to the used sourcepoints
 		cv::Point StartPoint;
 		double dummyv;
-		maxDistancePoint(Y, Ibin, IS3D, &StartPoint, &dummyv);
+		maxDistancePoint(Y, Ibin, &StartPoint, &dummyv);
 
 		double endpt[2] = { StartPoint.y, StartPoint.x };
-
 		cv::Mat D_mat;
 		ffm.fast_marching(trs, ivessel.cols, ivessel.rows, arrSourcePoint, SourcePoint.size(), endpt, 1, nb_iter_max,
 			&D_mat, &S);
 
-		
 		D_mat = D_mat.t();
 		//cv::transpose(D_mat, D_mat);
 		std::vector<cv::Point> ShortestLine;
@@ -2064,7 +1953,7 @@ void cVCO::GrowVesselUsingFastMarching(cv::Mat ivessel, std::vector<cv::Point> l
 
 		// Calculate the length of the new skeleton segment
 		double linelength;
-		GetLineLength(ShortestLine, IS3D, &linelength);
+		GetLineLength(ShortestLine, &linelength);
 
 		// Stop finding branches, if the lenght of the new branch is smaller
 		// then the diameter of the largest vessel
@@ -2590,7 +2479,7 @@ double cVCO::computeMeanOrientation(
 			int sub_Y = cur_endpt.y - interval_pt.y;
 
 			mean_ori = atan2(sub_Y, sub_X);
-		}
+}
 		else
 		{
 			cv::Point cur_endpt = vscl[vscl_idx].front();
@@ -3048,11 +2937,10 @@ void cVCO::GetLineLength(std::vector<cv::Point> L, bool IS3D, double *o_ll)
 		ll += cur_dist;
 	}
 
-
 	*o_ll = ll;
 }
 
-void cVCO::getBoundaryDistance(cv::Mat I, bool IS3D, cv::Mat *o_BoundaryDistance)
+void cVCO::getBoundaryDistance(cv::Mat I, cv::Mat *o_BoundaryDistance)
 {
 	//function BoundaryDistance = getBoundaryDistance(I, IS3D)
 	// Calculate Distance to vessel boundary
@@ -3077,7 +2965,7 @@ void cVCO::getBoundaryDistance(cv::Mat I, bool IS3D, cv::Mat *o_BoundaryDistance
 	*o_BoundaryDistance = BoundaryDistance;
 }
 
-void cVCO::maxDistancePoint(cv::Mat BoundaryDistance, cv::Mat I, bool IS3D, cv::Point *o_posD, double *o_maxD)
+void cVCO::maxDistancePoint(cv::Mat BoundaryDistance, cv::Mat I, cv::Point *o_posD, double *o_maxD)
 {
 	// Mask the result by the binary input image
 	BoundaryDistance.setTo(0, ~I);
@@ -3452,13 +3340,8 @@ std::vector<std::vector<std::vector<std::vector<int>>>> cVCO::linkedSeg(std::vec
 			if (s1 == i)
 				continue;
 
-			
-
 			for (int s2 = 0; s2 < seg[s1].size(); s2++)
 			{
-				
-
-
 				if (cur_sp == seg[s1][s2])
 				{
 					std::vector<int> cur_linking;
@@ -3504,13 +3387,9 @@ std::vector<std::vector<std::vector<std::vector<int>>>> cVCO::linkedSeg(std::vec
 						cur_linking.push_back(s2); // linked point index in linking segmentation
 						cur_linking.push_back(2); // lined type. 0 = start point, 1 = end point, 2 = mid point
 					}
-
 					ep_linking.push_back(cur_linking);
-
 				}
 			}
-
-			
 		}
 
 		cur_seg_spep_linking.push_back(sp_linking);
@@ -3525,6 +3404,7 @@ std::vector<std::vector<std::vector<std::vector<int>>>> cVCO::get_tp1_segm_linke
 {
 	return m_tp1_vsegm_linked_information;
 }
+
 
 cv::Mat cVCO::get_tp1_adjusted_vescl_mask_pp()
 {
@@ -3575,7 +3455,6 @@ cv::Mat cVCO::get_tp1_adjusted_vescl_mask_pp()
 		//	cv::GaussianBlur(convScaleX, convScaleX, cv::Size(11, 1), 3.f);
 		//	cv::GaussianBlur(convScaleY, convScaleY, cv::Size(11, 1), 3.f);
 
-		//	
 		//	for (int j = 11; j < convScaleX.cols-11; j++)
 		//	{
 		//		cv::Point pt(std::floor(convScaleX.at<double>(0, j) + 0.5),
@@ -3624,17 +3503,13 @@ cv::Mat cVCO::get_tp1_adjusted_vescl_mask_pp()
 	for (int i = 1; i < ncc; i++)
 	{
 		cv::Mat cur_cc = (cc == i);
-
 		std::vector<cv::Point> idx;
-
 		cv::findNonZero(cur_cc, idx);
 
 		if (idx.size() >minThre)
 		{
 			tp1_vmask_pp += cur_cc;
 		}
-		
-
 		if (idx.size() >max_cc_cnt)
 		{
 			max_cc_cnt = idx.size();
@@ -3682,24 +3557,27 @@ cv::Mat cVCO::get_tp1_adjusted_vescl_mask_pp()
 					break;
 				}
 			}
-
 		}
 		if (isGood)
 		{
 			adjustedE.push_back(E[i]);
-
 			for (int j = 0; j < E[i].size(); j++)
 			{
 				tp1_vmask_pp.at<uchar>(E[i][j]) = 255;
 			}
 		}
-
 	}
 
 	// return adjusted mask image
 	return tp1_vmask_pp;
 }
-std::vector<std::vector<cv::Point>> cVCO::get_adjust_VsegVpts2dArr_pp(std::vector<cv::Point> *Junction, std::vector<cv::Point> *End)
+
+// from vessel centerline mask, 
+//	- run MakeGraphFromImage to get graph structure (junction-end points) 
+//	- return structure E, end points End, junction points Junction
+std::vector<std::vector<cv::Point>> cVCO::get_adjust_VsegVpts2dArr_pp(
+	std::vector<cv::Point> *Junction, 
+	std::vector<cv::Point> *End)
 {
 	// OUPUTS
 	// - vessel segment center line to compose 2d array
@@ -3708,7 +3586,7 @@ std::vector<std::vector<cv::Point>> cVCO::get_adjust_VsegVpts2dArr_pp(std::vecto
 	// 
 	// for get vessel center line to adjust image
 	// 
-	
+
 
 	// get binary mask to darw adjusted vessel segmnt center line using get_tp1_adjusted_vescl_mask_pp function
 	cv::Mat tp1_vescl_mask = get_tp1_adjusted_vescl_mask_pp();
@@ -3721,16 +3599,19 @@ std::vector<std::vector<cv::Point>> cVCO::get_adjust_VsegVpts2dArr_pp(std::vecto
 	cv::Mat mapMat;
 	p2p.MakeGraphFromImage(tp1_vescl_mask, J, end, bJ, E, mapMat);
 
-	//// for visuallization
-	//cv::Mat view(tp1_vescl_mask.size(), CV_8UC1);
-	//view = 0;
-	//for (int i = 0; i < E.size(); i++)
-	//{
-	//	for (int j = 0; j < E[i].size(); j++)
-	//	{
-	//		view.at<uchar>(E[i][j]) = 255;
-	//	}
-	//}
+	// THIS DOES NOTHING
+	cv::Mat view(512, 512, CV_8UC1);
+	view = 0;
+	for (int i = 0; i < E.size(); i++)
+	{
+		for (int j = 0; j < E[i].size(); j++)
+		{
+			view.at<uchar>(E[i][j]) = 255;
+		}
+	}
+	// THIS DOES NOTHING
+
+	//get_linked(m_tp1_vsegm_vpt_2darr_pp, &end,&J );
 
 	// return result : junction points, end points, vessel segment center line
 	*Junction = J;
@@ -3738,6 +3619,7 @@ std::vector<std::vector<cv::Point>> cVCO::get_adjust_VsegVpts2dArr_pp(std::vecto
 	
 	return E;
 }
+
 void cVCO::get_linked(std::vector<std::vector<cv::Point>> pts, std::vector<cv::Point> *o_end, std::vector<cv::Point> *o_juntion)
 {
 	std::vector<cv::Point> end;
@@ -3747,6 +3629,7 @@ void cVCO::get_linked(std::vector<std::vector<cv::Point>> pts, std::vector<cv::P
 		cv::Point sp = pts[i].front();
 		cv::Point ep = pts[i].back();
 
+		
 		for (int j = 0; j < pts.size(); j++)
 		{
 			if (i == j)

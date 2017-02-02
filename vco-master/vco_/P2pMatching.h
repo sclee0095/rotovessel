@@ -6,7 +6,7 @@
 
 
 // *** point-to-point matching *** //
-class cP2pMatching
+class VCO_EXPORTS cP2pMatching
 {
 public:
 	cP2pMatching(int size=24);

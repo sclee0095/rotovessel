@@ -4,16 +4,6 @@
 #include <iostream>
 #include <fstream>
 
-#if !defined(_AFXDLL)
-#include <windows.h>
-#include <crtdbg.h>
-#if defined(DEBUG) | defined(_DEBUG)
-#if !defined(DEBUG_NEW)
-#define DEBUG_NEW new(_CLIENT_BLOCK, __FILE__, __LINE__)
-#define new DEBUG_NEW
-#endif
-#endif
-#endif
 
 using namespace std;
 using namespace cv;
