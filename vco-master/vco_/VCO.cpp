@@ -1692,86 +1692,20 @@ cv::Mat cVCO::postProcGrowVessel(cv::Mat img_tp1, cv::Mat m_frangi_vesselness_tp
 	cVCOParams params, std::vector<std::vector<cv::Point>> *E,std::vector<ves_feat_pt> feat)
 {
 	cv::Mat new_bimg;
-	std::vector<cv::Point> new_lidx, app_lidx;
 
-	//GrowVesselUsingFastMarching(m_frangi_vesselness_tp1, all_vessel_pt, params.thre_ivessel,
-	//	params, &new_bimg, &new_lidx, &app_lidx);
-
-	if (feat.empty())
-	{
-		GrowVesselUsingFastMarching(m_frangi_vesselness_tp1, all_vessel_pt, params.thre_ivessel,
-			params, &new_bimg, &new_lidx, &app_lidx);
-	}
-	else
-	{
-		GrowVesselUsingRegionGrowing(img_tp1, m_frangi_vesselness_tp1, E, feat, params, &new_bimg, &app_lidx);
-	}
-
-
-	//cv::Mat img_add_seg(new_bimg.rows, new_bimg.cols, CV_8UC1);
-	//img_add_seg = 0;
-
-	//cv::Mat exclude(img_h, img_w, CV_8UC1);
-	//exclude = 255;
-	//exclude(cv::Rect(boundaryRange, boundaryRange, img_w - boundaryRange, img_h - boundaryRange)) = 0;
-
-	//for (int i = 0; i < app_lidx.size(); i++)
-	//{
-	//	if (app_lidx[i].x >= 12 && app_lidx[i].y >= 12 && app_lidx[i].x < img_w - 12 && app_lidx[i].y < img_h - 12)
-	//		img_add_seg.at<uchar>(app_lidx[i].y, app_lidx[i].x) = 255;
-
-	//}
-	//img_add_seg.setTo(0,exclude==255);
-
-	//cP2pMatching p2p;
-	//p2p.thin(img_add_seg, img_add_seg);
-
-	//cv::Mat CCA;
-	//int nCCA = cv::connectedComponents(img_add_seg, CCA);
-
-	//std::vector<std::vector<cv::Point>> add_pts;
-	//std::vector<cv::Mat> added_seg_lists;
-	//std::vector<std::vector<cv::Point>> tmpE;
-	//for (int i = 1; i < nCCA; i++)
-	//{
-	//	cv::Mat cur_CCA = CCA == i;
-	//	cv::Mat idx;
-	//	cv::findNonZero(cur_CCA, idx);
-	//	if (idx.rows < 2)
-	//		continue;
-
-	//	std::vector<std::vector<cv::Point>> added_E;
-	//	std::vector<cv::Point> J,end;
-	//	cv::Mat map, bJ;
-	//	p2p.MakeGraphFromImage(cur_CCA, J, end, bJ, added_E, map);
-
-	//	for (int j = 0; j < added_E.size(); j++)
-	//	{
-	//		cv::Mat seg_img(img_h,img_w,CV_8UC1);
-	//		seg_img = 0;
-	//		for (int k = 0; k < added_E[j].size(); k++)
-	//		{
-	//			seg_img.at<uchar>(added_E[j][k].y, added_E[j][k].x) = 255;
-	//		}
-
-	//		added_seg_lists.push_back(seg_img);
-	//		tmpE.push_back(added_E[j]);
-	//	}
-	//}
-	//add_pts = tmpE;
-
-	//for (int i = 0; i < add_pts.size(); i++)
-	//	(*E).push_back(add_pts[i]);
+	// do post-processing
+	GrowVesselUsingRegionGrowing(img_tp1, m_frangi_vesselness_tp1, feat, params, E);
 	
+	// convert 2d array points into mask
 	cv::Mat tp1_pp_vscl_mask(img_h, img_w, CV_8UC1);
 	tp1_pp_vscl_mask = 0;
-
 	for (int i = 0; i < (*E).size(); i++)
 	for (int j = 0; j < (*E)[i].size(); j++)
 	{
 		tp1_pp_vscl_mask.at<uchar>((*E)[i][j].y, (*E)[i][j].x) = 255;
 	}
 
+	// for visualization
 	char str[100];
 	if (bVerbose)
 	{
@@ -1987,23 +1921,19 @@ void cVCO::GrowVesselUsingFastMarching(cv::Mat ivessel, std::vector<cv::Point> l
 void cVCO::GrowVesselUsingRegionGrowing(
 	cv::Mat tp1_img,
 	cv::Mat ivessel, 
-	std::vector<std::vector<cv::Point>> *vscl, 
 	std::vector<ves_feat_pt> feat, 
 	cVCOParams p,
-	cv::Mat *o_new_bimg, 
-	std::vector<cv::Point> *o_app_lidx)
+	std::vector<std::vector<cv::Point>> *vscl)
 {
 	// INPUTs
 	// tp1_img : t+1 8bit image 
 	// ivessel : t+1 vesselness image of float type
-	// vscl : vessel segment center line of 2d array vector
 	// feat : feature points (combine end points and junction points)
 	// p : parameters
+	// vscl : vessel segment center line of 2d array vector
 	//
 	// OUTPUTs
 	// vscl : vessel segment center line of 2d array vector
-	// o_new_bimg : binary image of result to compute  
-	// o_app_lidx : 2d array vector of result to compute  
 	//
 	// coded by kjNoh(170207)
 
@@ -2391,15 +2321,6 @@ void cVCO::GrowVesselUsingRegionGrowing(
 	cv::imwrite(region_growing_fname, view_tp1_img);
 	
 	*vscl = new_vscl;
-	*o_new_bimg = cv::Mat::zeros(nY, nX, CV_8UC1);
-	for (int i = 0; i < new_vscl.size(); i++)
-	{
-		for (int j = 0; j < new_vscl[i].size(); j++)
-		{
-			o_app_lidx->push_back(new_vscl[i][j]);
-			o_new_bimg->at<uchar>(new_vscl[i][j]) = 255;
-		}
-	}
 }
 
 double cVCO::computeMeanOrientation(

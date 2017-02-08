@@ -378,11 +378,9 @@ private:
 	void GrowVesselUsingRegionGrowing(
 		cv::Mat tp1_img,
 		cv::Mat ivessel,
-		std::vector<std::vector<cv::Point>> *vscl,
 		std::vector<ves_feat_pt> feat,
 		cVCOParams p,
-		cv::Mat *o_new_bimg,
-		std::vector<cv::Point> *o_app_lidx);
+		std::vector<std::vector<cv::Point>> *vscl);
 	// compute mean orientation
 	double computeMeanOrientation(std::vector<std::vector<cv::Point>> vscl, int check_spep, int mean_range, int vscl_idx);
 	// compute distance from boundary to seed points
