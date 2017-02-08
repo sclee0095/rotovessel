@@ -2,7 +2,7 @@
 /** 
 *  \file   config.h
 *  \brief  Main configuration file.
-*  \author Gabriel Peyré
+*  \author Gabriel Peyr?
 *  \date   2004
 */ 
 /*------------------------------------------------------------------------------*/

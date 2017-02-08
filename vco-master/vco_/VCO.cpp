@@ -1212,7 +1212,7 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 					pfm_start_points, 1, pfm_end_points, 1, nb_iter_max,
 					&D_mat, &S);
 				std::vector<cv::Point> geo_path;
-				fmm.compute_discrete_geodesic(D_mat, cv::Point(pfm_end_points[1], pfm_end_points[0]), &geo_path);
+				fmm.compute_discrete_geodesic(D_mat, cv::Point(pfm_end_points[0], pfm_end_points[1]), &geo_path);
 
 				if (is_first) {
 					for (int a = geo_path.size()-1; a >= 0; a--)
@@ -1390,7 +1390,7 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 						&D_mat, &S);
 					std::vector<cv::Point> geo_path;
 
-					fmm.compute_discrete_geodesic(D_mat, cv::Point(pfm_end_points[1], pfm_end_points[0]), &geo_path);
+					fmm.compute_discrete_geodesic(D_mat, cv::Point(pfm_end_points[0], pfm_end_points[1]), &geo_path);
 
 					for (int a = 0; a < geo_path.size(); a++)
 					{
@@ -1483,7 +1483,7 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 
 					std::vector<cv::Point> geo_path;
 
-					fmm.compute_discrete_geodesic(D_mat, cv::Point(pfm_end_points[1], pfm_end_points[0]), &geo_path);
+					fmm.compute_discrete_geodesic(D_mat, cv::Point(pfm_end_points[0], pfm_end_points[1]), &geo_path);
 
 					for (int a = 0; a < geo_path.size(); a++)
 					{
@@ -1580,7 +1580,7 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 
 					std::vector<cv::Point> geo_path;
 
-					fmm.compute_discrete_geodesic(D_mat, cv::Point(pfm_end_points[1], pfm_end_points[0]), &geo_path);
+					fmm.compute_discrete_geodesic(D_mat, cv::Point(pfm_end_points[0], pfm_end_points[1]), &geo_path);
 
 					if (geo_path.size())
 						for (int a = geo_path.size() - 1; a >= 0; a--)
@@ -1643,8 +1643,8 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 				double pfm_end_points[] = { ed_pt_x, ed_pt_y };
 				double pfm_start_points[] = { st_pt_x, st_pt_y };
 
-				double nb_iter_max = std::min(params.pfm_nb_iter_max, 1.2*std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)*std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols));
-
+				double nb_iter_max = std::min(params.pfm_nb_iter_max, 1.2*std::max(nY, nX)*std::max(nY, nX));
+				
 				double *S;
 
 				cv::Mat D_mat;
@@ -1654,7 +1654,7 @@ void cVCO::MakeConnectedCenterlineFromSubsampledPts(cv::Mat m_frangi_vesselness_
 
 				std::vector<cv::Point> geo_path;
 
-				fmm.compute_discrete_geodesic(D_mat, cv::Point(pfm_end_points[1], pfm_end_points[0]), &geo_path);
+				fmm.compute_discrete_geodesic(D_mat, cv::Point(pfm_end_points[0], pfm_end_points[1]), &geo_path);
 
 				for (int n = geo_path.size() - 1; n >1; n--)
 				{
@@ -1699,69 +1699,69 @@ cv::Mat cVCO::postProcGrowVessel(cv::Mat img_tp1, cv::Mat m_frangi_vesselness_tp
 
 	if (feat.empty())
 	{
-	GrowVesselUsingFastMarching(m_frangi_vesselness_tp1, all_vessel_pt, params.thre_ivessel,
-		params, &new_bimg, &new_lidx, &app_lidx);
+		GrowVesselUsingFastMarching(m_frangi_vesselness_tp1, all_vessel_pt, params.thre_ivessel,
+			params, &new_bimg, &new_lidx, &app_lidx);
 	}
 	else
 	{
-		GrowVesselUsingRegionGrowing(img_tp1, m_frangi_vesselness_tp1, *E, feat, 0.01f, params, &new_bimg, &app_lidx);
+		GrowVesselUsingRegionGrowing(img_tp1, m_frangi_vesselness_tp1, E, feat, params, &new_bimg, &app_lidx);
 	}
 
 
-	cv::Mat img_add_seg(new_bimg.rows, new_bimg.cols, CV_8UC1);
-	img_add_seg = 0;
+	//cv::Mat img_add_seg(new_bimg.rows, new_bimg.cols, CV_8UC1);
+	//img_add_seg = 0;
 
-	cv::Mat exclude(img_h, img_w, CV_8UC1);
-	exclude = 255;
-	exclude(cv::Rect(boundaryRange, boundaryRange, img_w - boundaryRange, img_h - boundaryRange)) = 0;
+	//cv::Mat exclude(img_h, img_w, CV_8UC1);
+	//exclude = 255;
+	//exclude(cv::Rect(boundaryRange, boundaryRange, img_w - boundaryRange, img_h - boundaryRange)) = 0;
 
-	for (int i = 0; i < app_lidx.size(); i++)
-	{
-		if (app_lidx[i].x >= 12 && app_lidx[i].y >= 12 && app_lidx[i].x < img_w - 12 && app_lidx[i].y < img_h - 12)
-			img_add_seg.at<uchar>(app_lidx[i].y, app_lidx[i].x) = 255;
+	//for (int i = 0; i < app_lidx.size(); i++)
+	//{
+	//	if (app_lidx[i].x >= 12 && app_lidx[i].y >= 12 && app_lidx[i].x < img_w - 12 && app_lidx[i].y < img_h - 12)
+	//		img_add_seg.at<uchar>(app_lidx[i].y, app_lidx[i].x) = 255;
 
-	}
-	img_add_seg.setTo(0,exclude==255);
+	//}
+	//img_add_seg.setTo(0,exclude==255);
 
-	cP2pMatching p2p;
-	p2p.thin(img_add_seg, img_add_seg);
+	//cP2pMatching p2p;
+	//p2p.thin(img_add_seg, img_add_seg);
 
-	cv::Mat CCA;
-	int nCCA = cv::connectedComponents(img_add_seg, CCA);
+	//cv::Mat CCA;
+	//int nCCA = cv::connectedComponents(img_add_seg, CCA);
 
-	std::vector<std::vector<cv::Point>> add_pts;
-	std::vector<cv::Mat> added_seg_lists;
-	std::vector<std::vector<cv::Point>> tmpE;
-	for (int i = 1; i < nCCA; i++)
-	{
-		cv::Mat cur_CCA = CCA == i;
-		cv::Mat idx;
-		cv::findNonZero(cur_CCA, idx);
-		if (idx.rows < 2)
-			continue;
+	//std::vector<std::vector<cv::Point>> add_pts;
+	//std::vector<cv::Mat> added_seg_lists;
+	//std::vector<std::vector<cv::Point>> tmpE;
+	//for (int i = 1; i < nCCA; i++)
+	//{
+	//	cv::Mat cur_CCA = CCA == i;
+	//	cv::Mat idx;
+	//	cv::findNonZero(cur_CCA, idx);
+	//	if (idx.rows < 2)
+	//		continue;
 
-		std::vector<std::vector<cv::Point>> added_E;
-		std::vector<cv::Point> J,end;
-		cv::Mat map, bJ;
-		p2p.MakeGraphFromImage(cur_CCA, J, end, bJ, added_E, map);
+	//	std::vector<std::vector<cv::Point>> added_E;
+	//	std::vector<cv::Point> J,end;
+	//	cv::Mat map, bJ;
+	//	p2p.MakeGraphFromImage(cur_CCA, J, end, bJ, added_E, map);
 
-		for (int j = 0; j < added_E.size(); j++)
-		{
-			cv::Mat seg_img(img_h,img_w,CV_8UC1);
-			seg_img = 0;
-			for (int k = 0; k < added_E[j].size(); k++)
-			{
-				seg_img.at<uchar>(added_E[j][k].y, added_E[j][k].x) = 255;
-			}
+	//	for (int j = 0; j < added_E.size(); j++)
+	//	{
+	//		cv::Mat seg_img(img_h,img_w,CV_8UC1);
+	//		seg_img = 0;
+	//		for (int k = 0; k < added_E[j].size(); k++)
+	//		{
+	//			seg_img.at<uchar>(added_E[j][k].y, added_E[j][k].x) = 255;
+	//		}
 
-			added_seg_lists.push_back(seg_img);
-			tmpE.push_back(added_E[j]);
-		}
-	}
-	add_pts = tmpE;
+	//		added_seg_lists.push_back(seg_img);
+	//		tmpE.push_back(added_E[j]);
+	//	}
+	//}
+	//add_pts = tmpE;
 
-	for (int i = 0; i < add_pts.size(); i++)
-		(*E).push_back(add_pts[i]);
+	//for (int i = 0; i < add_pts.size(); i++)
+	//	(*E).push_back(add_pts[i]);
 	
 	cv::Mat tp1_pp_vscl_mask(img_h, img_w, CV_8UC1);
 	tp1_pp_vscl_mask = 0;
@@ -1984,24 +1984,30 @@ void cVCO::GrowVesselUsingFastMarching(cv::Mat ivessel, std::vector<cv::Point> l
 	*o_app_lidx = app_lidx;
 
 }
-void cVCO::GrowVesselUsingRegionGrowing(cv::Mat tp1_img,cv::Mat ivessel, std::vector<std::vector<cv::Point>> vscl, std::vector<ves_feat_pt> feat, double thre, cVCOParams p,
-	cv::Mat *o_new_bimg, std::vector<cv::Point> *o_app_lidx)
+void cVCO::GrowVesselUsingRegionGrowing(
+	cv::Mat tp1_img,
+	cv::Mat ivessel, 
+	std::vector<std::vector<cv::Point>> *vscl, 
+	std::vector<ves_feat_pt> feat, 
+	cVCOParams p,
+	cv::Mat *o_new_bimg, 
+	std::vector<cv::Point> *o_app_lidx)
 {
-	//function[new_bimg, new_lidx, app_lidx] = GrowVesselUsingFastMarching(ivessel, lidx, thre)
-	//% input
-	//%
-	//% ivessel : vesselness
-	//% lidx : linear indices for vessels
-	//% thre : threshold for 'ivessel', default 0.05
-	//%
-	//% output
-	//%
-	//% new_bimg : binary mask for a new vessel
-	//% new_lidx : linear indices for a new vessels
-	//% app_lidx : linear indices of appened parts
-	//%
-	//% coded by syshin(160305)
-	//% converted by kjNoh(160600)
+	// INPUTs
+	// tp1_img : t+1 8bit image 
+	// ivessel : t+1 vesselness image of float type
+	// vscl : vessel segment center line of 2d array vector
+	// feat : feature points (combine end points and junction points)
+	// p : parameters
+	//
+	// OUTPUTs
+	// vscl : vessel segment center line of 2d array vector
+	// o_new_bimg : binary image of result to compute  
+	// o_app_lidx : 2d array vector of result to compute  
+	//
+	// coded by kjNoh(170207)
+
+	std::vector<std::vector<cv::Point>> new_vscl = *vscl;
 
 	// read parameters from save data
 	FILE *f;
@@ -2040,44 +2046,12 @@ void cVCO::GrowVesselUsingRegionGrowing(cv::Mat tp1_img,cv::Mat ivessel, std::ve
 	int nY = tp1_img.rows;
 	int nX = tp1_img.cols;
 	
+	// convert frangi vesselness map to double type image 
+	cv::Mat dFrangi_vesselness_tp1;
+	m_frangi_vesselness_tp1.convertTo(dFrangi_vesselness_tp1, CV_64FC1);
 
 	// for fast marching method
 	cFastMarching fmm;
-
-	//bool verbose = false;
-	//bool IS3D = false;
-
-	//// Convert double image to logical
-	////cv::Mat Ibin = ivessel >= thre;
-	//cv::Mat Ibin = ivessel >= 0.01;
-
-	//cv::Mat CC;
-	//int numCC = cv::connectedComponents(Ibin, CC);
-
-	//cv::Mat bROI = cv::Mat::zeros(numCC + 1, 1, CV_64FC1);
-	//Ibin = cv::Mat::zeros(nY, nX, CV_8UC1);
-
-	//std::vector<bool> check_CC(numCC);
-
-	//for (int i = 0; i < vscl.size(); i++)
-	//{
-	//	for (int j = 0; j < vscl[i].size(); j++)
-	//	{
-	//		if (CC.at<int>(vscl[i][j]) != 0)
-	//		{
-	//			if (!check_CC[CC.at<int>(vscl[i][j]) - 1])
-	//				check_CC[CC.at<int>(vscl[i][j]) - 1] = true;
-	//		}
-	//	}
-	//}
-
-	//for (int i = 0; i < check_CC.size(); i++)
-	//{
-	//	if (check_CC[i])
-	//	{
-	//		Ibin += (CC == i+1);
-	//	}
-	//}
 
 	// find end points in all of feature points 
 	std::vector<cv::Point> ends;
@@ -2092,18 +2066,17 @@ void cVCO::GrowVesselUsingRegionGrowing(cv::Mat tp1_img,cv::Mat ivessel, std::ve
 	cv::Mat visited_img(nY,nX,CV_8UC1);
 	visited_img = 0;
 
+	// draw exist points before
+	for (int i = 0; i < new_vscl.size(); i++)
+	for (int j = 0; j < new_vscl[i].size(); j++)
+	{
+		visited_img.at<uchar>(new_vscl[i][j]) = 255;
+	}
+
 	// initialization for visualization image
 	cv::Mat view_tp1_img;
 	cv::cvtColor(tp1_img, view_tp1_img, CV_GRAY2BGR);
-	cv::Mat exteded_path_img(512, 512, CV_8UC1);
-	exteded_path_img = 0;
-
-	// draw exist points before
-	for (int i = 0; i < vscl.size(); i++)
-	for (int j = 0; j < vscl[i].size(); j++)
-	{
-		visited_img.at<uchar>(vscl[i][j]) = 255;
-	}
+	view_tp1_img.setTo(cv::Scalar(255, 0, 0), visited_img);
 
 	for (int i = 0; i < nEndpt; i++)
 	{
@@ -2117,18 +2090,18 @@ void cVCO::GrowVesselUsingRegionGrowing(cv::Mat tp1_img,cv::Mat ivessel, std::ve
 
 		// selected end point in 'feat' vector
 		int toggle_chek = 0;
-		for (int j = 0; j < vscl.size(); j++)
+		for (int j = 0; j < new_vscl.size(); j++)
 		{
-			if (vscl[j].empty()||vscl[j].size()<10)
+			if (new_vscl[j].empty() || new_vscl[j].size()<10)
 				continue;
 
-			if (vscl[j].front() == ends[i])
+			if (new_vscl[j].front() == ends[i])
 			{
 				vscl_idx = j;
 				check_spep = 0;
 				toggle_chek++;
 			}
-			else if (vscl[j].back() == ends[i])
+			else if (new_vscl[j].back() == ends[i])
 			{
 				vscl_idx = j;
 				check_spep = 1;
@@ -2173,7 +2146,7 @@ void cVCO::GrowVesselUsingRegionGrowing(cv::Mat tp1_img,cv::Mat ivessel, std::ve
 		double gamma = vParams[3];
 		
 		// compute mean orientation
-		mean_ori = computeMeanOrientation(vscl, check_spep, mean_range, vscl_idx);
+		mean_ori = computeMeanOrientation(new_vscl, check_spep, mean_range, vscl_idx);
 
 		//mean_ori = mean_ori / (double)mean_range;
 		
@@ -2182,7 +2155,7 @@ void cVCO::GrowVesselUsingRegionGrowing(cv::Mat tp1_img,cv::Mat ivessel, std::ve
 		cv::Mat candi_img(nY,nX,CV_8UC1);
 		candi_img = 0;
 
-		cv::Mat cur_exteded_path_img(512, 512, CV_8UC1);
+		cv::Mat cur_exteded_path_img(nY, nX, CV_8UC1);
 		cur_exteded_path_img = 0;
 		cur_exteded_path_img.at<uchar>(cur_pt) = 255;
 		cv::Point pre_pt;
@@ -2199,8 +2172,8 @@ void cVCO::GrowVesselUsingRegionGrowing(cv::Mat tp1_img,cv::Mat ivessel, std::ve
 		int inverval_search_range = vParams[4];
 		cv::Mat tmp_search_pt(inverval_search_range, inverval_search_range, CV_8UC1);
 		tmp_search_pt = 0;
-		cv::circle(tmp_search_pt, cv::Point(inverval_search_range / 2, inverval_search_range / 2), inverval_search_range / 2, 255,0);
-		cv::circle(tmp_search_pt, cv::Point(inverval_search_range / 2, inverval_search_range / 2), 3, 0, 0);
+		cv::circle(tmp_search_pt, cv::Point(inverval_search_range / 2, inverval_search_range / 2), inverval_search_range / 2, 255,-1);
+		cv::circle(tmp_search_pt, cv::Point(inverval_search_range / 2, inverval_search_range / 2), 3,0,-1);
 		std::vector<cv::Point> search_pts;
 		cv::findNonZero(tmp_search_pt, search_pts);
 
@@ -2308,20 +2281,18 @@ void cVCO::GrowVesselUsingRegionGrowing(cv::Mat tp1_img,cv::Mat ivessel, std::ve
 				}
 
 				// compute total cost
-				double cost = (ori_cost/dist_value);
+				double cost = (ori_cost * dist_value); // try.. limite cost to 1
 				
-				if ( visited_img.at<uchar>(neibor_pt) /*|| candi_img.at<uchar>(neibor_pt)*/
-					|| cost<thr_cost || tp1_img.at<uchar>(neibor_pt) >80)  
-				{
-					//printf("failed cost :%lf, dist_vess :%lf, dist_inten :%lf, diff ori :%lf\n", cost, dist_vesselness,dist_intensity,cur_ori);
-					//printf("cur_ori : %lf, mean_ori : %lf\n", cur_ori / 3.14 * 180, mean_ori / 3.14 * 180);
+				if ( visited_img.at<uchar>(neibor_pt) || cost<thr_cost || tp1_img.at<uchar>(neibor_pt) >100)  
 					continue;
-				}
 
-				//candi.push_back(neibor_pt);
-				//candi_img.at<uchar>(neibor_pt) = 255;
-				printf("stored cost :%lf, dist_vess :%lf, dist_inten :%lf, diff ori :%lf\n", cost, dist_vesselness, dist_intensity, cur_ori);
-				printf("cur_ori : %lf, mean_ori : %lf\n", cur_ori / 3.14 * 180, mean_ori / 3.14 * 180);
+				//// for debugging mode
+				//printf("stored cost :%lf, dist_vess :%lf, dist_inten :%lf, diff ori :%lf\n",
+				//	cost, dist_vesselness, dist_intensity, cur_ori);
+				//printf("cur_ori : %lf, mean_ori : %lf\n", 
+				//	cur_ori / 3.14 * 180, mean_ori / 3.14 * 180);
+
+				// recode max point & cost
 				if (max_cost < cost)
 				{
 					next_pt = neibor_pt;
@@ -2331,12 +2302,7 @@ void cVCO::GrowVesselUsingRegionGrowing(cv::Mat tp1_img,cv::Mat ivessel, std::ve
 
 			cur_pt = next_pt;
 			
-			//if (candi.empty())
-			//	break;
-
-			//cur_pt = candi.back();
-			//candi.pop_back();
-
+			// end of while roof
 			if (max_cost == 0 || cur_pt == cv::Point(-1,-1))
 				break;
 
@@ -2346,8 +2312,7 @@ void cVCO::GrowVesselUsingRegionGrowing(cv::Mat tp1_img,cv::Mat ivessel, std::ve
 				double pfm_end_points[] = { cur_pt.x, cur_pt.y };
 				double pfm_start_points[] = { pre_pt.x, pre_pt.y };
 				double nb_iter_max = std::min(params.pfm_nb_iter_max,
-					(1.2*std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)*
-					std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)));
+					(1.2*std::max(nY, nX)*std::max(nY, nX)));
 
 				double *D, *S;
 
@@ -2357,13 +2322,23 @@ void cVCO::GrowVesselUsingRegionGrowing(cv::Mat tp1_img,cv::Mat ivessel, std::ve
 					&D_mat, &S);
 
 				std::vector<cv::Point> geo_path;
-
 				fmm.compute_discrete_geodesic(D_mat, cur_pt, &geo_path);
 
-				// have to edit code kjnoh
-				std::vector<cv::Point>::iterator it;
-				it = vscl[vscl_idx].begin();
-				vscl[vscl_idx].insert(it, cur_pt);
+				geo_path.pop_back();
+
+				while (!geo_path.empty())
+				{
+					std::vector<cv::Point>::iterator it;
+					it = new_vscl[vscl_idx].begin();
+					new_vscl[vscl_idx].insert(it, geo_path.back());
+
+					// for visualization
+					view_tp1_img.at<uchar>(geo_path.back().y, geo_path.back().x * 3 + 0) = 0;
+					view_tp1_img.at<uchar>(geo_path.back().y, geo_path.back().x * 3 + 1) = 255;
+					view_tp1_img.at<uchar>(geo_path.back().y, geo_path.back().x * 3 + 2) = 0;
+
+					geo_path.pop_back();
+				}
 			}
 			else if (check_spep)
 			{
@@ -2371,13 +2346,12 @@ void cVCO::GrowVesselUsingRegionGrowing(cv::Mat tp1_img,cv::Mat ivessel, std::ve
 				double pfm_start_points[] = { cur_pt.x, cur_pt.y };
 				double pfm_end_points[] = { pre_pt.x, pre_pt.y };
 				double nb_iter_max = std::min(params.pfm_nb_iter_max,
-					(1.2*std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)*
-					std::max(m_frangi_vesselness_tp1.rows, m_frangi_vesselness_tp1.cols)));
+					(1.2*std::max(nY, nX)*std::max(nY, nX)));
 
 				double *D, *S;
 
 				cv::Mat D_mat;
-				fmm.fast_marching(dtp1_img, dtp1_img.cols, dtp1_img.rows,
+				fmm.fast_marching(dFrangi_vesselness_tp1, dtp1_img.cols, dtp1_img.rows,
 					pfm_start_points, 1, pfm_end_points, 1, nb_iter_max,
 					&D_mat, &S);
 
@@ -2385,26 +2359,29 @@ void cVCO::GrowVesselUsingRegionGrowing(cv::Mat tp1_img,cv::Mat ivessel, std::ve
 
 				fmm.compute_discrete_geodesic(D_mat, pre_pt, &geo_path);
 
-				for (int i = 0; i < geo_path.size(); i++)
-					vscl[vscl_idx].push_back(geo_path[i]);
+				for (int i = 1; i < geo_path.size(); i++)
+				{
+					new_vscl[vscl_idx].push_back(geo_path[i]);
+
+					// for visualization
+					view_tp1_img.at<uchar>(geo_path[i].y, geo_path[i].x * 3 + 0) = 0;
+					view_tp1_img.at<uchar>(geo_path[i].y, geo_path[i].x * 3 + 1) = 255;
+					view_tp1_img.at<uchar>(geo_path[i].y, geo_path[i].x * 3 + 2) = 0;
+				}
 			}
 
 			// compute next mean orientation
-			mean_ori = computeMeanOrientation(vscl, check_spep, mean_range, vscl_idx);
+			mean_ori = computeMeanOrientation(new_vscl, check_spep, mean_range, vscl_idx);
 
 			visited_img.at<uchar>(cur_pt) = 255;
-			cur_exteded_path_img.at<uchar>(cur_pt) = 255;
-			exteded_path_img += cur_exteded_path_img;
-			
-			view_tp1_img.setTo(cv::Scalar(255, 0, 0), visited_img);
-			view_tp1_img.setTo(cv::Scalar(0, 0, 255), exteded_path_img);
+			// for visualization
+			view_tp1_img.at<uchar>(cur_pt.y, cur_pt.x * 3 + 0) = 0;
+			view_tp1_img.at<uchar>(cur_pt.y, cur_pt.x * 3 + 1) = 0;
+			view_tp1_img.at<uchar>(cur_pt.y, cur_pt.x * 3 + 2) = 255;
 		}
 	}
 
 	// draw result & save image
-	view_tp1_img.setTo(cv::Scalar(255, 0, 0), visited_img);
-	view_tp1_img.setTo(cv::Scalar(0, 0, 255), exteded_path_img);
-
 	char region_growing_folder_name[200];
 	char region_growing_fname[200];
 	sprintf_s(region_growing_folder_name, "../PostProcessing_region_growing");
@@ -2413,13 +2390,14 @@ void cVCO::GrowVesselUsingRegionGrowing(cv::Mat tp1_img,cv::Mat ivessel, std::ve
 
 	cv::imwrite(region_growing_fname, view_tp1_img);
 	
-	*o_new_bimg = exteded_path_img.clone();
-	
-	for (int i = 0; i < vscl.size(); i++)
+	*vscl = new_vscl;
+	*o_new_bimg = cv::Mat::zeros(nY, nX, CV_8UC1);
+	for (int i = 0; i < new_vscl.size(); i++)
 	{
-		for (int j = 0; j < vscl[i].size(); j++)
+		for (int j = 0; j < new_vscl[i].size(); j++)
 		{
-			o_app_lidx->push_back(vscl[i][j]);
+			o_app_lidx->push_back(new_vscl[i][j]);
+			o_new_bimg->at<uchar>(new_vscl[i][j]) = 255;
 		}
 	}
 }

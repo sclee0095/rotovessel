@@ -209,6 +209,8 @@ void cGMMg::endLearning()
 			coefs[ci] = (double)n / totalSampleCount;
 			mean[ci] = sums[ci] / n;
 			cov[ci] = prods[ci] / n - mean[ci] * mean[ci];
+			if (cov[ci] < std::numeric_limits<double>::epsilon())
+				cov[ci] += variance;
 			inverseCovs[ci] = 1 / cov[ci];
 		}
 	}

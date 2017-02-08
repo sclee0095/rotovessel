@@ -97,7 +97,9 @@ CLiveVesselDlg::CLiveVesselDlg(CWnd* pParent /*=NULL*/)
 , m_bPostProc(false)
 , m_bOverlay(false)
 , m_bManualEdit(false)
-, mouseL_state(false)
+, m_bDrawManualSegment(false)
+, m_ctrlRadioNavi(0)
+, m_bCancel(false)
 {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
@@ -119,6 +121,8 @@ void CLiveVesselDlg::DoDataExchange(CDataExchange* pDX)
 	//DDX_Control(pDX, IDC_CHECK_OVERLAY, m_bOverlay);
 	DDX_Control(pDX, IDC_CHECK_MANUAL_EDIT, m_ButtManual);
 	DDX_Control(pDX, IDC_STATIC_FILE_NAME, m_ctrl_FileName);
+	DDX_Radio(pDX, IDC_RADIO_MASK, m_ctrlRadioNavi);
+	DDX_Control(pDX, ID_PROGRESS, m_ctrlProgress);
 }
 
 BEGIN_MESSAGE_MAP(CLiveVesselDlg, CDialogEx)
@@ -142,7 +146,6 @@ BEGIN_MESSAGE_MAP(CLiveVesselDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_RADIO_MOVE, &CLiveVesselDlg::OnBnClickedRadioMove)
 	ON_WM_SETCURSOR()
 	ON_BN_CLICKED(IDC_BUTTON_VCO_FRAME, &CLiveVesselDlg::OnBnClickedButtonVcoFrame)
-	//ON_BN_CLICKED(IDC_BUTTON_FINISH, &CLiveVesselDlg::FinishAndSave2File)
 	ON_BN_CLICKED(IDC_BUTTON_VCO_SEQUENCE, &CLiveVesselDlg::OnBnClickedButtonVcoSequence)
 	ON_WM_LBUTTONDBLCLK()
 	ON_WM_RBUTTONDOWN()
@@ -155,6 +158,8 @@ BEGIN_MESSAGE_MAP(CLiveVesselDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_CHECK_MANUAL_EDIT, &CLiveVesselDlg::OnBnClickedCheckManualEdit)
 	ON_WM_CLOSE()
 	ON_BN_CLICKED(IDC_BUTTON_CONVERT_DATA, &CLiveVesselDlg::OnBnClickedButtonConvertData)
+	ON_WM_MOUSEWHEEL()
+	ON_BN_CLICKED(IDC_BUTTON_CANCEL, &CLiveVesselDlg::OnBnClickedButtonCancel)
 END_MESSAGE_MAP()
 
 int CALLBACK BrowseCallback(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData);
@@ -166,8 +171,6 @@ BOOL CLiveVesselDlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
 
-
-	// IDM_ABOUTBOX는 시스템 명령 범위에 있어야 합니다.
 	ASSERT((IDM_ABOUTBOX & 0xFFF0) == IDM_ABOUTBOX);
 	ASSERT(IDM_ABOUTBOX < 0xF000);
 
@@ -185,11 +188,8 @@ BOOL CLiveVesselDlg::OnInitDialog()
 		}
 	}
 
-
-	// 이 대화 상자의 아이콘을 설정합니다.  응용 프로그램의 주 창이 대화 상자가 아닐 경우에는
-	//  프레임워크가 이 작업을 자동으로 수행합니다.
-	SetIcon(m_hIcon, TRUE);			// 큰 아이콘을 설정합니다.
-	SetIcon(m_hIcon, FALSE);		// 작은 아이콘을 설정합니다.
+	SetIcon(m_hIcon, TRUE);
+	SetIcon(m_hIcon, FALSE);
 
 	
 	// to write log file
@@ -199,8 +199,8 @@ BOOL CLiveVesselDlg::OnInitDialog()
 
 	vesselImg = NULL;
 	m_ctrlSlider.SetPos(0);
-	ptStart = cv::Point(-1, -1);
-	ptEnd = cv::Point(-1, -1);
+	m_curVesSegmStartPt = cv::Point(-1, -1);
+	m_curVesSegmEndPt = cv::Point(-1, -1);
 	m_bLoad = false;
 	m_iMouseState = 0;
 	m_iszDrawCircle = 1;
@@ -215,8 +215,8 @@ BOOL CLiveVesselDlg::OnInitDialog()
 	m_fNull_width = 0;
 	m_fNull_height = 0;
 
-	m_picZoom.GetWindowRect(&m_rcZoom);
-	ScreenToClient(&m_rcZoom);
+	m_picZoom.GetWindowRect(&m_rcNavi);
+	ScreenToClient(&m_rcNavi);
 	m_Picture.GetWindowRect(&m_rcPic);
 	ScreenToClient(&m_rcPic);
 	m_iMode_zoomWnd = 0;
@@ -229,7 +229,8 @@ BOOL CLiveVesselDlg::OnInitDialog()
 	///////////////////////
 	// coded by kjNoh 160922
 	selectedFeat = cv::Point(-1, -1);
-	featSearchRagne = 5;
+	featSearchRange = 5;
+	lineSearchRange = 2;
 	mouseR_state = 0;
 	dragIdx = -1;
 	dragSpEp = -1;
@@ -245,7 +246,16 @@ BOOL CLiveVesselDlg::OnInitDialog()
 	CheckDlgButton(IDC_CHECK_POST_PROCESSING, FALSE);
 	CheckDlgButton(IDC_CHECK_OVERLAY, TRUE);
 	m_ButtManual.SetCheck(false);
-	return TRUE; 
+
+	//2017.01.05_daseul
+	bCtrl = false;
+	bWheel = false;
+	m_fZoomRatio = 1;
+
+	// 2017. 02. 07 - SJKOH PROGRESS
+	m_ctrlProgress.SetRange(0, 100);
+	m_ctrlProgress.SetPos(0);
+	return TRUE;
 }
 
 void CLiveVesselDlg::OnSysCommand(UINT nID, LPARAM lParam)
@@ -264,7 +274,6 @@ void CLiveVesselDlg::OnSysCommand(UINT nID, LPARAM lParam)
 
 void CLiveVesselDlg::OnPaint()
 {
-	
 	if (IsIconic())
 	{
 		CPaintDC dc(this); 
@@ -283,38 +292,22 @@ void CLiveVesselDlg::OnPaint()
 	else
 	{
 		if (m_bLoad)
-		{
-			
-			WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
+		{	
+			WriteLog(__FILE__, __LINE__, __FUNCTION__);
 			cv::Mat disp;
 			vesselImg.copyTo(disp);
 
 			//if (SegmTree.size() != 0)
 			if (m_bOverlay)
 			{
-				WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
+				WriteLog(__FILE__, __LINE__, __FUNCTION__);
 				for (int y = 0; y < m_mask.rows; y++)
 				for (int x = 0; x < m_mask.cols; x++)
 				{
+					disp.at<cv::Vec3b>(y, x) = vesselImg.at<cv::Vec3b>(y, x);
 					if (m_mask.at<uchar>(y, x))
 					{
-						int R = 150;
-						int G = vesselImg.at<uchar>(y, x * 3 + 1);
-						int B = vesselImg.at<uchar>(y, x * 3 + 0);
-
-						disp.at<uchar>(y, x * 3 + 0) = B;
-						disp.at<uchar>(y, x * 3 + 1) = G;
-						disp.at<uchar>(y, x * 3 + 2) = R;
-					}
-					else
-					{
-						int R = vesselImg.at<uchar>(y, x * 3 + 2);
-						int G = vesselImg.at<uchar>(y, x * 3 + 1);
-						int B = vesselImg.at<uchar>(y, x * 3 + 0);
-
-						disp.at<uchar>(y, x * 3 + 0) = B;
-						disp.at<uchar>(y, x * 3 + 1) = G;
-						disp.at<uchar>(y, x * 3 + 2) = R;
+						disp.at<uchar>(y, x * 3 + 2) = 150;
 					}
 				}
 				
@@ -322,12 +315,12 @@ void CLiveVesselDlg::OnPaint()
 				{
 					if (SegmTree.vecSegmTree[i].size() != 0)
 					{
-						WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
+						WriteLog(__FILE__, __LINE__, __FUNCTION__);
 						//std::vector<cv::Point> tmp_Segm = SegmTree.get(i);
 						CVesSegm tmp_Segm = SegmTree.get(i);
 						for (int j = 0; j < tmp_Segm.size(); j++)
 						{
-							WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
+							WriteLog(__FILE__, __LINE__, __FUNCTION__);
 
 							int pt_x = tmp_Segm[j].pt.x;
 							int pt_y = tmp_Segm[j].pt.y;
@@ -350,7 +343,7 @@ void CLiveVesselDlg::OnPaint()
 
 					if (featureTree.getSize())
 					{
-						WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
+						WriteLog(__FILE__, __LINE__, __FUNCTION__);
 						featureInfo cur_feat = featureTree.get(i);
 						if (cur_feat.spType)
 							cv::circle(disp, cur_feat.sp, 3, CV_RGB(0, 255, 0)); 
@@ -371,12 +364,12 @@ void CLiveVesselDlg::OnPaint()
 					{
 						if (SegmTree.vecSegmTree[i].size() != 0)
 						{
-							WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
+							WriteLog(__FILE__, __LINE__, __FUNCTION__);
 							//std::vector<cv::Point> tmp_Segm = SegmTree.get(i);
 							CVesSegm tmp_Segm = SegmTree.get(i);
 							for (int j = 0; j < tmp_Segm.size(); j++)
 							{
-								WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");;
+								WriteLog(__FILE__, __LINE__, __FUNCTION__);
 
 								int pt_x = tmp_Segm[j].pt.x;
 								int pt_y = tmp_Segm[j].pt.y;
@@ -399,7 +392,7 @@ void CLiveVesselDlg::OnPaint()
 
 						if (featureTree.getSize())
 						{
-							WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");;
+							WriteLog(__FILE__, __LINE__, __FUNCTION__);
 							featureInfo cur_feat = featureTree.get(i);
 							if (cur_feat.spType)
 								cv::circle(disp, cur_feat.sp, 3, CV_RGB(0, 255, 0));
@@ -416,54 +409,22 @@ void CLiveVesselDlg::OnPaint()
 				}
 				//DrawPicture(disp);
 
-
-
-				//for (int y = 0; y < FrangiScale.rows; y++)
-				//for (int x = 0; x < FrangiScale.cols; x++)
-				//{
-				//	if (FrangiScale.at<double>(y, x))
-				//	{
-				//		double B = FrangiScale.at<double>(y, x * 3 + 0);
-				//		double G = FrangiScale.at<double>(y, x * 3 + 1);
-				//		double R = 200;
-
-				//		disp.at<uchar>(y, x * 3 + 0) = B;
-				//		disp.at<uchar>(y, x * 3 + 1) = G;
-				//		disp.at<uchar>(y, x * 3 + 2) = R;
-				//	}
-				//}
-
+				// if currently the mouse hovering above predetermined line, 
+				// i.e., the user is selecting a specific vessel segment line, highlight that line
 				if (iLineSelected_state == SELECT_LINE)
 				{
-					assert(SegmTree.nSegm > iLineIndex);
-					WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
-					//std::vector<cv::Point> selectedSegm = SegmTree.get(iLineIndex);
-					CVesSegm selectedSegm = SegmTree.get(iLineIndex);
-					for (int i = 0; i < selectedSegm.size(); i++)
-					{
-
-						for (int y = -1; y <= 1; y++)
-						for (int x = -1; x <= 1; x++)
-						{
-							int pt_x = selectedSegm[i].pt.x;
-							int pt_y = selectedSegm[i].pt.y;
-							disp.at<uchar>(pt_y, pt_x * 3 + 0) = 255;
-							disp.at<uchar>(pt_y, pt_x * 3 + 1) = 0;
-							disp.at<uchar>(pt_y, pt_x * 3 + 2) = 255;
-						}
-					}
-
-
+					assert(0 <= iLineIndex && iLineIndex < SegmTree.nSegm);
+					WriteLog(__FILE__, __LINE__, __FUNCTION__);
+					CVesSegm curSegm = SegmTree.get(iLineIndex);
+					for (int i = 0; i < curSegm.size(); i++)
+						cv::circle(disp, curSegm[i].pt, 1, cv::Scalar(255, 0, 255), -1);
 				}
-
 				else if (iFeatSelected_state == CLEAR_LINE)
 				{
 					if (iLineIndex != -1)
 					{
 						assert(SegmTree.nSegm > iLineIndex);
-						WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");;
-
-						//std::vector<cv::Point> curSegm = SegmTree.get(iLineIndex);
+						WriteLog(__FILE__, __LINE__, __FUNCTION__);
 						CVesSegm curSegm = SegmTree.get(iLineIndex);
 						for (int i = 0; i < curSegm.size(); i++)
 						{
@@ -477,18 +438,16 @@ void CLiveVesselDlg::OnPaint()
 				// codeby kjNoh 160922
 				if (iFeatSelected_state == SELECT_FEATURE)
 				{
-					WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");;
+					WriteLog(__FILE__, __LINE__, __FUNCTION__);;
 					int label = FeatrueImg.at<int>(selectedFeat)-1;
-
 					assert(featureTree.nFeature > label);
-
 					if (featureTree.getSize() && label >= 0)
 					{
-						WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
+						WriteLog(__FILE__, __LINE__, __FUNCTION__);
 						featureInfo tmp_feat = featureTree.get(label);
 						if (tmp_feat.sp == selectedFeat)
 						{
-							WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");;
+							WriteLog(__FILE__, __LINE__, __FUNCTION__);
 
 							if (tmp_feat.spType)
 								cv::circle(disp, tmp_feat.sp, 3, CV_RGB(0, 255, 0), -1);
@@ -497,7 +456,7 @@ void CLiveVesselDlg::OnPaint()
 						}
 						else
 						{
-							WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");;
+							WriteLog(__FILE__, __LINE__, __FUNCTION__);
 							if (tmp_feat.epType)
 								cv::circle(disp, tmp_feat.ep, 3, CV_RGB(0, 255, 0), -1);
 							else
@@ -509,43 +468,65 @@ void CLiveVesselDlg::OnPaint()
 
 				if (m_ptCur.x >= 0 && m_ptCur.y >= 0 && m_ptCur.x < vesselImg.cols && m_ptCur.y < vesselImg.rows)
 				{
-					WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
-					if (ptStart != cv::Point(-1, -1)) {
-						//cv::line(disp, ptStart, ptEnd, CV_RGB(255, 0, 0));
+					WriteLog(__FILE__, __LINE__, __FUNCTION__);
+					if (m_curVesSegmStartPt != cv::Point(-1, -1)) {
+						//cv::line(disp, m_curVesSegmStartPt, m_curVesSegmEndPt, CV_RGB(255, 0, 0));
 						// *** LiveVessel method (modified) - find gradient-based geodesic between two points
-						for (int i = 0; i < cur_path.size(); i++)
+						for (int i = 0; i < m_curVesSegmPath.size(); i++)
 						{
-							WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
-							disp.at<uchar>(cur_path[i].y, cur_path[i].x * 3 + 0) = 0;
-							disp.at<uchar>(cur_path[i].y, cur_path[i].x * 3 + 1) = 0;
-							disp.at<uchar>(cur_path[i].y, cur_path[i].x * 3 + 2) = 255;
+							WriteLog(__FILE__, __LINE__, __FUNCTION__);
+							disp.at<uchar>(m_curVesSegmPath[i].y, m_curVesSegmPath[i].x * 3 + 0) = 0;
+							disp.at<uchar>(m_curVesSegmPath[i].y, m_curVesSegmPath[i].x * 3 + 1) = 0;
+							disp.at<uchar>(m_curVesSegmPath[i].y, m_curVesSegmPath[i].x * 3 + 2) = 255;
 						}
 						cv::circle(disp, m_ptCur, m_iszDrawCircle, CV_RGB(0, 255, 255), -1);
 					}
 
 					else
 					{
-						WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
+						WriteLog(__FILE__, __LINE__, __FUNCTION__);
 						cv::circle(disp, m_ptCur, m_iszDrawCircle, CV_RGB(0, 255, 255), -1);
 					}
 					disp.copyTo(m_disp_tmp);
 				}
 			}
 
+			//2017.02.07_daseul _annotate
+			//if (m_iMouseState == ZOOM_MODE || m_iMouseState == ZOOMWND_CLICK_DOWN) {
+			//	WriteLog(__FILE__, __LINE__, __FUNCTION__);
+			//	printf("onpaint_zoom\n");
+			//	//cv::circle(m_zoomImg, cv::Point((m_ptCur_Zoom.x / m_fZoomRatio), (m_ptCur_Zoom.y / m_fZoomRatio)), 1, cv::Scalar(0, 0, 255), 1);
 
-			if (m_iMouseState == ZOOM_MODE || m_iMouseState == ZOOMWND_CLICK_DOWN) {
-				WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::OnPaint()");
-				printf("onpaint_zoom\n");
-				//cv::circle(m_zoomImg, cv::Point((m_ptCur_Zoom.x / m_fZoomRatio), (m_ptCur_Zoom.y / m_fZoomRatio)), 1, cv::Scalar(0, 0, 255), 1);
+			//	cv::Mat dispZoom;
+			//	m_zoomImg.copyTo(dispZoom);
+			//	DrawNavi2window(dispZoom);
+			//}
 
-				cv::Mat dispZoom;
-				m_zoomImg.copyTo(dispZoom);
-				DrawPictureZoom(dispZoom);
+			//2017.01.05_daseul _zoom in&out
+			if (bCtrl & bWheel)
+			{
+				//image resize to zoom ratio
+				cv::resize(m_disp_tmp, m_zoomImg, cv::Size(m_disp_tmp.rows * m_fZoomRatio, m_disp_tmp.cols * m_fZoomRatio));
+
+				cv::Point zoomPt = m_ptCur * m_fZoomRatio;
+				cv::Point letfTop, rigthBottom;
+
+				//compute the view range from resized image
+				letfTop.x = (zoomPt.x - m_ptCur.x) * m_fRatio;
+				letfTop.y = (zoomPt.y - m_ptCur.y) * m_fRatio;
+				rigthBottom.x = (zoomPt.x + (m_rcPic.Width() - m_ptCur.x)) * m_fRatio;
+				rigthBottom.y = (zoomPt.y + (m_rcPic.Height() - m_ptCur.y)) * m_fRatio;
+
+				m_zoom_tmp = m_zoomImg(cv::Rect(letfTop.x, letfTop.y, (rigthBottom.x - letfTop.x), (rigthBottom.y - letfTop.y)));
+				m_zoom_tmp.copyTo(disp);
+
+				m_iMouseState = ZOOM_MODE;
+				//bWheel = false;
 			}
-
 			DrawPicture(disp);
-		}
 
+			cv::resize(m_disp_tmp, disp, cv::Size(disp.rows, disp.cols));
+		}
 		CDialogEx::OnPaint();
 	}
 }
@@ -557,7 +538,8 @@ HCURSOR CLiveVesselDlg::OnQueryDragIcon()
 }
 
 
-void CLiveVesselDlg::FindFilesInDir(CString dir, CString ext, std::vector<std::string> &path_list)
+void CLiveVesselDlg::FindFilesInDir(CString dir, CString ext, 
+	std::vector<std::string> &path_list)
 {
 	CFileFind finder;
 	CString str = L"\\*." + ext;
@@ -593,16 +575,12 @@ void CLiveVesselDlg::OnBnClickedButtonImageLoad()
 	if (pidlBrowse != NULL)
 	{
 		SHGetPathFromIDList(pidlBrowse, m_pszPathName);
-
 		vecFname.clear();
 		SegmTree.rmAll();
 		featureTree.rmAll();
-		//m_fileName.clear();
-		bivecPointsOfLine.clear();
 		vecPoints.clear();
-		vecSpEpLists_Zoom.clear();
 		m_vecPtZoom.clear();
-		cur_path.clear();
+		m_curVesSegmPath.clear();
 		//2016.12.22_daseul
 		m_tmpLine.clear();
 		tStart = clock();
@@ -610,13 +588,14 @@ void CLiveVesselDlg::OnBnClickedButtonImageLoad()
 	else
 		return;
 	// *** end: launch UI to get image sequence directory *** //
+	m_ctrlProgress.SetPos(40); //2017.02.07 - SJKOH - PROGRESS
 	
 	// *** generate list of files of image sequence directory *** //
 	FindFilesInDir(CString(m_pszPathName), L"bmp", vecFname);
 	// *** end: generate list of files of image sequence directory *** //
 
 	// minor initializations
-	ptStart = ptEnd = cv::Point(-1, -1);
+	m_curVesSegmStartPt = m_curVesSegmEndPt = cv::Point(-1, -1);
 	iSliderPos = 0;
 
 	// *** for all vessel sequence frames: (pre-process & save) or (load pre-processed data) *** //
@@ -633,7 +612,8 @@ void CLiveVesselDlg::OnBnClickedButtonImageLoad()
 			SaveFrangi(pre_fn);
 		}
 	}
-	// *** end: for all vessel sequence frames: (pre-process & save) or (load pre-processed data) *** //
+	// *** end: (pre-process & save) or (load pre-processed data) *** //
+	m_ctrlProgress.SetPos(60); //2017.02.07 - SJKOH - PROGRESS
 
 	// *** for initial frame, load frame and preprocessed info *** //
 	// load frame
@@ -660,6 +640,7 @@ void CLiveVesselDlg::OnBnClickedButtonImageLoad()
 	if (m_mask.empty())
 		m_mask = cv::Mat::zeros(vesselImg.size(), CV_8UC1);
 	// *** END loading frame and preprocessed info for initial frame *** //
+	m_ctrlProgress.SetPos(80); //2017.02.07 - SJKOH - PROGRESS
 
 	m_fRatio = vesselImg.cols / (float)m_rcPic.Width();
 	m_width = vesselImg.cols;
@@ -671,10 +652,11 @@ void CLiveVesselDlg::OnBnClickedButtonImageLoad()
 
 	updateSegm();
 	OnPaint();
-
+	m_ctrlProgress.SetPos(100); //2017.02.07 - SJKOH - PROGRESS
 	WriteLog(__FILE__, __LINE__, __FUNCTION__);
 	// show sequence directory name above viewing window
 	m_ctrl_FileName.SetWindowText(m_pszPathName);
+	m_ctrlProgress.SetPos(0); //2017.02.07 - SJKOH - PROGRESS
 }
 
 
@@ -699,7 +681,7 @@ void CLiveVesselDlg::OnNMCustomdrawSlider1(NMHDR *pNMHDR, LRESULT *pResult)
 
 void CLiveVesselDlg::DrawPicture(cv::Mat disp)
 {
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::DrawPicture()");
+	WriteLog(__FILE__, __LINE__, __FUNCTION__);
 	CRect rc;
 	m_Picture.GetClientRect(rc);
 
@@ -707,7 +689,7 @@ void CLiveVesselDlg::DrawPicture(cv::Mat disp)
 	cv::Mat view_vesselImg;
 	disp.copyTo(view_vesselImg);
 	cv::resize(view_vesselImg, view_vesselImg, cv::Size(rc.Width(), rc.Height()));
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::DrawPicture()");
+	WriteLog(__FILE__, __LINE__, __FUNCTION__);
 
 	//cv::flip(view_vesselImg, view_vesselImg, 0);
 	int nX = view_vesselImg.cols;
@@ -731,237 +713,13 @@ void CLiveVesselDlg::DrawPicture(cv::Mat disp)
 
 	char log[260];
 	sprintf_s(log, "nX: %d, nY: %d", nX, nY);
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::DrawPicture()", log);
+	WriteLog(__FILE__, __LINE__, __FUNCTION__, log);
 	::StretchDIBits(hdc, 0, 0, nX, nY, 0, 0, nX, nY, view_vesselImg.data, (BITMAPINFO*)&bitmaphaeader, DIB_RGB_COLORS, SRCCOPY);
-	WriteLog(__FILE__, __LINE__, "CLiveVesselDlg::DrawPicture()");
+	WriteLog(__FILE__, __LINE__, __FUNCTION__);
 	m_Picture.ReleaseDC(pdc);
 }
 
 
-void CLiveVesselDlg::OnLButtonDown(UINT nFlags, CPoint point)
-{
-	if (vecFname.size() == NULL)
-	{
-		OnBnClickedButtonImageLoad();
-		return;
-	}
-
-	cv::Point center(std::round((point.x - m_rcPic.left) * m_fRatio), 
-					 std::round((point.y - m_rcPic.top) * m_fRatio));
-
-	WriteLog(__FILE__, __LINE__, __FUNCTION__);
-
-	if (0 <= center.x && center.x < m_width&& 0 <= center.y && center.y < m_height)
-	{
-		WriteLog(__FILE__, __LINE__, __FUNCTION__);
-		m_Picture.SetFocus();
-		// if this left click is to set start point,
-		// set starting point, initialize
-		if (ptStart == cv::Point(-1, -1))
-		{
-			// edited by kjNoh 160922
-			if (iFeatSelected_state == SELECT_FEATURE)
-			{
-				ptStart = selectedFeat;
-				WriteLog(__FILE__, __LINE__, __FUNCTION__);
-			}
-			else
-			{
-				float minD = FLT_MAX;
-				cv::Point minPt(-1,-1);
-				for (int y = -1; y <= 1; y++)
-				for (int x = -1; x <= 1; x++)
-				{
-					// DEBUGGED: SOOCHAHN LEE, 20161219-11:49:00
-					// changed AND && to OR ||
-					if ((y == 0 && x == 0) || 
-						center.x + x < 0 || center.y + y < 0 ||
-						center.x + x >= vesselImg.cols || center.y + y >= vesselImg.rows)
-						continue;
-
-					if (SegLabelImg.at<int>(center.y + y, center.x + x))
-					{
-						if (minD > std::sqrt(y*y + x*x))
-						{
-							minD = std::sqrt(y*y + x*x);
-							minPt = center + cv::Point(x,y);
-						}
-					}
-				}
-
-				if (minPt != cv::Point(-1, -1))
-				{
-					ptStart = minPt;
-				}
-				else
-					ptStart = center;
-
-				WriteLog(__FILE__, __LINE__, __FUNCTION__);
-			}
-				
-			WriteLog(__FILE__, __LINE__, __FUNCTION__);
-			ptEnd = center;
-			//m_iMouseState = SP_CLICK_DOWN;
-		}
-		// if this left click is to set end point
-		else
-		{
-			// edited by kjNoh 160922
-			if (iFeatSelected_state == SELECT_FEATURE)
-			{
-				ptEnd = selectedFeat;
-				WriteLog(__FILE__, __LINE__, __FUNCTION__);
-			}
-			else
-			{
-				float minD = FLT_MAX;
-				cv::Point minPt(-1, -1);
-				
-				for (int y = -1; y <= 1; y++)
-				for (int x = -1; x <= 1; x++)
-				{
-					if (y == x && 
-						center.x + x <0 && center.y + y <0 && 
-						center.x + x >=vesselImg.cols&&center.y + y >=vesselImg.rows)
-						continue;
-
-					if (SegLabelImg.at<int>(center.y + y, center.x + x))
-					{
-						if (minD > std::sqrt(y*y + x*x))
-						{
-							minD = std::sqrt(y*y + x*x);
-							minPt = center + cv::Point(x, y);
-						}
-					}
-				}
-
-				if (minPt != cv::Point(-1, -1))
-				{
-					ptEnd = minPt;
-				}
-				else
-					ptEnd = center;
-				WriteLog(__FILE__, __LINE__, __FUNCTION__);
-			}
-			// 	
-			fmm.compute_discrete_geodesic(frangiDist, ptEnd, &cur_path);
-			std::reverse(cur_path.begin(), cur_path.end()); // coeded by kjNoh 160922
-			WriteLog(__FILE__, __LINE__, __FUNCTION__);
-
-			CVesSegm vesSegm(cur_path);
-			//MakeRegionMask_NKJ(vecPts, FrangiScale, m_mask);
-			ComputeVesselRadii(vesSegm, FrangiScale, vesselImgG);
-			MakeRegionMask_VesRadii(vesSegm, m_mask);
-
-			SegmTree.addSegm(vesSegm);
-
-			//////////////////////////
-			//coded by kjNoh 160922 
-			featureInfo cur_spepInfor;
-			cur_spepInfor.sp = ptStart;
-			cur_spepInfor.ep = ptEnd;
-			cur_spepInfor.spType = 0;
-			cur_spepInfor.epType = 0;
-
-			featureTree.addFeat(cur_spepInfor);
-
-			for (int i = 0; i < vesSegm.size(); i++)
-				SegLabelImg.at<int>(vesSegm[i].pt) = SegmTree.nSegm;
-
-			FeatrueImg.at<int>(vesSegm[0].pt) = SegmTree.nSegm;
-			FeatrueImg.at<int>(vesSegm.back().pt) = SegmTree.nSegm;
-			////////////////////////
-
-			ptStart = ptEnd;
-			WriteLog(__FILE__, __LINE__, __FUNCTION__);
-		}
-		
-		// if manual edit, do no shortest path computations
-		if (m_bManualEdit)
-		{
-			mouseL_state = true;
-			cur_path.clear();
-			m_prePt = ptStart;
-			WriteLog(__FILE__, __LINE__, __FUNCTION__);
-		}
-		// if LiveVessel mode, initialize shortest path computations by fast marching method
-		else
-		{
-			// perform fast-marching method, get frangiDist
-			OpenEndedFMM(ptEnd);
-			WriteLog(__FILE__, __LINE__, __FUNCTION__);
-		}
-
-		//2016.12.22_daseul
-		FinishAndSave2File();
-	}
-
-	if (m_bZoom)
-	{
-		WriteLog(__FILE__, __LINE__, __FUNCTION__);
-		if (0 <= center.x && center.x < m_rcPic.Width() && 0 <= center.y && center.y < m_rcPic.Height())
-		if (m_iMode_zoomWnd != 1)
-			m_ptZoom = center;
-
-		if (0 <= point.x - m_rcZoom.left && point.x - m_rcZoom.left < m_rcZoom.Width() && 0 <= point.y - m_rcZoom.top && point.y - m_rcZoom.top < m_rcZoom.Height())
-		{
-			WriteLog(__FILE__, __LINE__, __FUNCTION__);
-			if (!m_bMove)
-			{
-				WriteLog(__FILE__, __LINE__, __FUNCTION__);
-				m_iMouseState = ZOOMWND_CLICK_DOWN;
-				m_picZoom.SetFocus();
-
-				m_ptCur_Zoom.x = (point.x - m_rcZoom.left) * m_fZoomRatio;
-				m_ptCur_Zoom.y = (point.y - m_rcZoom.top) * m_fZoomRatio;
-
-				cv::circle(m_cropImg, m_ptCur_Zoom, 1, cv::Scalar(255, 255, 255), 2);
-				//cv::imshow("circle_crop", m_cropImg);
-
-				cv::Point pt;
-				if (m_leftTop.x == 0) {
-					m_fNull_width = m_zoomImg.cols - m_cropImg.cols;
-					pt.x = m_ptCur_Zoom.x - m_fNull_width;
-				}
-				else
-					pt.x = m_ptCur_Zoom.x;
-				if (m_leftTop.y == 0) {
-					m_fNull_height = m_zoomImg.rows - m_cropImg.rows;
-					pt.y = m_ptCur_Zoom.y - m_fNull_height;
-				}
-				else
-					pt.y = m_ptCur_Zoom.y;
-
-				if (ptStart == cv::Point(-1, -1))
-				{
-					ptStart = pt + m_leftTop;
-					ptEnd = pt + m_leftTop;
-				}
-				else
-				{
-					ptEnd = pt + m_leftTop;
-					//PointsOfLine();
-
-					CVesSegm vecPts;
-					vecPts.push_back(CVesSegmPt(ptStart));
-					vecPts.push_back(CVesSegmPt(ptEnd));
-					SegmTree.addSegm(vecPts);
-
-					ptStart = ptEnd;
-					OnPaint();
-				}
-			}
-			else
-				m_vecPtZoom.push_back(ptEnd);
-		}
-		ZoomProcessing();
-	}
-
-	OnPaint();
-	//ZoomProcessing(); // annoated by noh 160928
-
-	CDialogEx::OnLButtonDown(nFlags, point);
-}
 
 
 void CLiveVesselDlg::OnBnClickedButtonLeftSlide()
@@ -981,7 +739,7 @@ void CLiveVesselDlg::OnBnClickedButtonLeftSlide()
 
 void CLiveVesselDlg::OpenEndedFMM()
 {
-	double pfm_start_points[] = { ptStart.x, ptStart.y };
+	double pfm_start_points[] = { m_curVesSegmStartPt.x, m_curVesSegmStartPt.y };
 	double nb_iter_max = std::min(pram.pfm_nb_iter_max,
 		(1.2*std::max(frangiImg.rows, frangiImg.cols)*
 		std::max(frangiImg.rows, frangiImg.cols)));
@@ -994,16 +752,48 @@ void CLiveVesselDlg::OpenEndedFMM()
 		&frangiDist, &S);
 }
 
-void CLiveVesselDlg::OpenEndedFMM(cv::Point ptEnd)
+void CLiveVesselDlg::OpenEndedFMM(cv::Point end_pt)
 {
-	double pfm_start_points[] = { ptStart.x, ptStart.y };
-	double pfm_end_points[] = { ptEnd.x, ptEnd.y };
+	double pfm_start_points[] = { m_curVesSegmStartPt.x, m_curVesSegmStartPt.y };
+	double pfm_end_points[] = { end_pt.x, end_pt.y };
 	double nb_iter_max = std::min(pram.pfm_nb_iter_max,
 		(1.2*std::max(frangiImg.rows, frangiImg.cols)*
 		std::max(frangiImg.rows, frangiImg.cols)));
 	cv::Mat copy_frangiImg;
 	copy_frangiImg = frangiImg.clone();
 	copy_frangiImg.setTo(1e-10, copy_frangiImg < 1e-10);
+	double *S;
+	fmm.fast_marching(copy_frangiImg, frangiImg.cols, frangiImg.rows,
+		pfm_start_points, 1, pfm_end_points, 1, nb_iter_max,
+		&frangiDist, &S);
+}
+
+void CLiveVesselDlg::OpenEndedFMMwithUserPath(cv::Point end_pt)
+{
+	double pfm_start_points[] = { m_curVesSegmStartPt.x, m_curVesSegmStartPt.y };
+	double pfm_end_points[] = { end_pt.x, end_pt.y };
+	double nb_iter_max = std::min(pram.pfm_nb_iter_max,
+		(1.2*std::max(frangiImg.rows, frangiImg.cols)*
+		std::max(frangiImg.rows, frangiImg.cols)));
+	cv::Mat copy_frangiImg;
+	copy_frangiImg = frangiImg.clone();
+	copy_frangiImg.setTo(1e-10, copy_frangiImg < 1e-10);
+
+	// incorporating user path proximity
+	if (m_userPath.size() > 1) {
+		// draw user path
+		cv::Mat user_path = cv::Mat::ones(frangiImg.size(), CV_8UC1) * 255;
+		for (int i = 0; i < m_userPath.size() - 1; i++) {
+			cv::line(user_path, m_userPath[i], m_userPath[i + 1], cv::Scalar(0));
+		}
+		// compute distance transform to user path
+		cv::Mat user_path_dist, user_path_dist_64F;
+		cv::distanceTransform(user_path, user_path_dist, CV_DIST_L2, cv::DIST_MASK_PRECISE);
+		// combine with frangi based speed 
+		user_path_dist.convertTo(user_path_dist_64F, CV_64FC1);
+		user_path_dist_64F = 0.1 / (1 + user_path_dist_64F);
+		copy_frangiImg = copy_frangiImg + user_path_dist_64F;
+	}
 	double *S;
 	fmm.fast_marching(copy_frangiImg, frangiImg.cols, frangiImg.rows,
 		pfm_start_points, 1, pfm_end_points, 1, nb_iter_max,
@@ -1028,8 +818,6 @@ void CLiveVesselDlg::OnBnClickedButtonRightSlide()
 
 BOOL CLiveVesselDlg::PreTranslateMessage(MSG* pMsg)
 {
-	// TODO: 여기에 특수화된 코드를 추가 및/또는 기본 클래스를 호출합니다.	
-
 	if (!m_bLoad)
 		return 0;
 
@@ -1040,21 +828,47 @@ BOOL CLiveVesselDlg::PreTranslateMessage(MSG* pMsg)
 		if (!bWorking)
 		{
 			//2016.12.21_daseul _UNDO
-			if ((GetKeyState(VK_CONTROL) & 0x8000) && pMsg->wParam == 'Z')
+			if ((GetKeyState(VK_CONTROL) & 0x8000) /*&& pMsg->wParam == 'Z'*/)
 			{
-				//Store the last path of SegmTree to m_tmpLine and Remove the last path of SegmTree
-				if (SegmTree.nSegm != 0)
+				if (pMsg->wParam == 'Z')
 				{
-					m_tmpLine.push_back(SegmTree.get(SegmTree.nSegm - 1));
-					SegmTree.rmSegm(SegmTree.nSegm - 1);
-				}
-				//initialize selected line
-				iLineSelected_state = CLEAR_LINE;
-				//iLineIndex = -1;
+					//Store the last path of SegmTree to m_tmpLine and Remove the last path of SegmTree
+					if (SegmTree.nSegm != 0)
+					{
+						m_tmpLine.push_back(SegmTree.get(SegmTree.nSegm - 1));
+						SegmTree.rmSegm(SegmTree.nSegm - 1);
+					}
+					//initialize selected line
+					iLineSelected_state = CLEAR_LINE;
+					//iLineIndex = -1;
 
-				//re-draw vessel mask
-				ReDrawMask();
-				iLineIndex = -1;
+					//re-draw vessel mask
+					ReDrawMask();
+					iLineIndex = -1;
+				}
+
+				//2017.02.07_daseul _zoom in&out using +, - key
+				else if (GetKeyState(VK_OEM_PLUS) & 0x8000)
+				{
+					bWheel = true;
+					m_fZoomRatio += 0.3;
+					OnPaint();
+				}
+
+				else if (GetKeyState(VK_OEM_MINUS) & 0x8000)
+				{
+					bWheel = true;
+					m_fZoomRatio -= 0.3;
+
+					if (m_fZoomRatio < 1)
+						m_fZoomRatio = 1;
+
+					OnPaint();
+				}
+
+				//2017.01.05_daseul _zoom in&out function
+				else
+					bCtrl = true;
 			}
 
 			//2016.12.21_daseul _REDO
@@ -1147,9 +961,11 @@ BOOL CLiveVesselDlg::PreTranslateMessage(MSG* pMsg)
 				updateSegm();
 				break;
 
-			case VK_SPACE:	//Q. 포커스가 Button에 있을때 스페이스 누르면 영상 로드 등 버튼 기능 수행 _해결방법찾아보기
-				ptStart = ptEnd = cv::Point(-1, -1);
-				mouseL_state = false;
+			case VK_SPACE:	
+				m_curVesSegmStartPt = m_curVesSegmEndPt = cv::Point(-1, -1);
+				// end drawing mode
+				m_bDrawFMMSegment = false;
+				m_bDrawManualSegment = false;
 				if (m_iMouseState == ZOOMWND_CLICK_DOWN || m_iMouseState == ZOOM_MODE) {
 					printf("space");
 				}
@@ -1279,15 +1095,278 @@ BOOL CLiveVesselDlg::PreTranslateMessage(MSG* pMsg)
 					m_bManualEdit = true;
 					CheckDlgButton(IDC_CHECK_MANUAL_EDIT, TRUE);
 				}
-
+				ClearCurPath();
+				m_bDrawManualSegment = false;
+				m_bDrawFMMSegment = false;
+				OnPaint();
 				break;
-			
 			}
 
 		}
 	}
+	// 2017. 02. 07 SJKOH - NAVIGATOR
+	UpdateData(TRUE);
+	if (m_ctrlRadioNavi == 0)
+	{
+		std::string tmp_mask_path = vecFname[iSliderPos];
+		tmp_mask_path.pop_back(); tmp_mask_path.pop_back(); tmp_mask_path.pop_back(); tmp_mask_path.pop_back();
+
+		cv::Mat tmp_mask_1;
+		cv::String cur_name = tmp_mask_path + "_vsc_mask" + ".png";
+		tmp_mask_1 = cv::imread(cur_name, CV_LOAD_IMAGE_GRAYSCALE);
+
+		// ADDTIONAL kjnoh 170208
+		if (tmp_mask_1.empty())
+			tmp_mask_1 = cv::Mat::zeros(m_height, m_width,CV_8UC1);
+		
+		DrawNavi2window(tmp_mask_1);
+	}
+	else if (m_ctrlRadioNavi == 1)
+	{
+		std::string vessel_path = vecFname[iSliderPos];
+		vessel_path.pop_back(); vessel_path.pop_back(); vessel_path.pop_back(); vessel_path.pop_back();
+
+		cv::Mat tmp_vessel;
+		cv::String cur_name = vessel_path + ".bmp";
+		tmp_vessel = cv::imread(cur_name, CV_LOAD_IMAGE_GRAYSCALE);
+
+		DrawNavi2window(tmp_vessel);
+	}
+	UpdateData(FALSE);
 	//return CDialogEx::PreTranslateMessage(pMsg);
 	return 0;
+}
+
+bool CLiveVesselDlg::checkIfPointIsNearFeat(cv::Point pt)
+{
+	bool findNearFeat = false;
+	for (int y = -featSearchRange; y <= featSearchRange; y++)
+	{
+		for (int x = -featSearchRange; x <= featSearchRange; x++)
+		{
+			if (pt.y + y >= 0 && pt.y + y < m_height &&
+				pt.x + x >= 0 && pt.x + x < m_width &&
+				FeatrueImg.at<int>(pt.y + y, pt.x + x))
+			{
+				iFeatSelected_state = SELECT_FEATURE;
+				selectedFeat = cv::Point(pt.x + x, pt.y + y);
+				findNearFeat = true;
+				break;
+			}
+		}
+		if (findNearFeat)
+			break;
+	}
+	return findNearFeat;
+}
+
+bool CLiveVesselDlg::checkIfPointIsNearLine(cv::Point pt)
+{
+	bool findNearSeg = false;
+	for (int y = -lineSearchRange; y <= lineSearchRange; y++)
+	{
+		for (int x = -lineSearchRange; x <= lineSearchRange; x++)
+		{
+			if (pt.y + y >= 0 && pt.y + y < m_height &&
+				pt.x + x >= 0 && pt.x + x < m_width &&
+				SegLabelImg.at<int>(pt.y + y, pt.x + x))
+			{
+				iLineSelected_state = SELECT_LINE;
+				iLineIndex = SegLabelImg.at<int>(pt.y + y, pt.x + x) - 1;
+				selectedLinePoint = cv::Point(pt.x + x, pt.y + y);
+				findNearSeg = true;
+				break;
+			}
+		}
+		if (findNearSeg)
+			break;
+	}
+	return findNearSeg;
+}
+
+void CLiveVesselDlg::FinalizeVesselSegment(std::vector<cv::Point> vpath)
+{
+	CVesSegm vesSegm(vpath);
+	ComputeVesselRadii(vesSegm, FrangiScale, vesselImgG);
+	MakeRegionMask_VesRadii(vesSegm, m_mask);
+	//MakeRegionMask_NKJ(m_curVesSegmPath, FrangiScale, m_mask);
+	SegmTree.addSegm(vesSegm);
+
+	//////////////////////////
+	//coded by kjNoh 160922 
+	featureInfo cur_spepInfor;
+	cur_spepInfor.sp = m_curVesSegmStartPt;
+	cur_spepInfor.ep = m_curVesSegmEndPt;
+	cur_spepInfor.spType = 0;
+	cur_spepInfor.epType = 0;
+
+	featureTree.addFeat(cur_spepInfor);
+
+	for (int i = 0; i < m_curVesSegmPath.size(); i++)
+		SegLabelImg.at<int>(m_curVesSegmPath[i]) = SegmTree.nSegm;
+	FeatrueImg.at<int>(m_curVesSegmPath[0]) = SegmTree.nSegm;
+	FeatrueImg.at<int>(m_curVesSegmPath.back()) = SegmTree.nSegm;
+}
+
+void CLiveVesselDlg::ClearCurPath()
+{
+	m_curVesSegmPath.clear();
+	m_curVesSegmStartPt = m_curVesSegmEndPt = cv::Point(-1, -1);
+	m_userPath.clear();
+}
+
+void CLiveVesselDlg::OnLButtonDown(UINT nFlags, CPoint point)
+{
+	// if no image, do nothing
+	if (vecFname.size() == NULL)
+		return;
+
+	// get image coordinate for mouse input coordinate
+	cv::Point pt_img(std::round((point.x - m_rcPic.left) * m_fRatio),
+					 std::round((point.y - m_rcPic.top) * m_fRatio));
+
+	// if image coordinate is valid
+	if (0 <= pt_img.x && pt_img.x < m_width && 0 <= pt_img.y && pt_img.y < m_height)
+	{
+		WriteLog(__FILE__, __LINE__, __FUNCTION__);
+		m_Picture.SetFocus();
+
+		// *** determine "CLICK POINT" - to snap clicked point to nearby feature or line point
+		cv::Point click_pt;
+		// if the mouse curser is (was) above a predetermined feature point, 
+		// set click point to that feature point
+		if (iFeatSelected_state == SELECT_FEATURE)
+		{
+			click_pt = selectedFeat;
+			WriteLog(__FILE__, __LINE__, __FUNCTION__);
+		}
+		// if the mouse curser is (was) above a predetermined line point, 
+		// set click point to that line point
+		else if (iLineSelected_state == SELECT_LINE)
+		{
+			click_pt = selectedLinePoint;
+			WriteLog(__FILE__, __LINE__, __FUNCTION__);
+		}
+		// if none of the above, set starting point to current image coordinate
+		else
+		{
+			click_pt = pt_img;
+			WriteLog(__FILE__, __LINE__, __FUNCTION__);
+		}
+		// *** end of determining "CLICK POINT" 
+
+		// if manual edit, simple, just toggle drawing mode, do no shortest path computations
+		if (m_bManualEdit)
+		{
+			m_bDrawManualSegment = true;
+			m_curVesSegmPath.clear();
+			m_curVesSegmStartPt = click_pt;
+			m_prePt = m_curVesSegmStartPt;
+			WriteLog(__FILE__, __LINE__, __FUNCTION__);
+		}
+		// if non-manual = LiveVessel mode
+		else {
+			// *** if currently not drawing (and thus this left click is to set start point),
+			// begin draw segment mode *** //
+			if (!m_bDrawFMMSegment)
+			{
+				// set to drawing mode
+				m_bDrawFMMSegment = true;
+				// initialize starting point to click point and end point as current point
+				m_curVesSegmStartPt = click_pt;
+				m_curVesSegmEndPt = pt_img;
+				m_userPath.clear();
+				m_userPath.push_back(m_curVesSegmStartPt);
+				m_curVesSegmPath.clear();
+				WriteLog(__FILE__, __LINE__, __FUNCTION__);
+			}
+			// if this left click is to set end point
+			else
+			{
+				// set end point and compute path
+				m_curVesSegmEndPt = click_pt;
+				m_userPath.push_back(m_curVesSegmEndPt);
+				fmm.compute_discrete_geodesic(frangiDist, m_curVesSegmEndPt, &m_curVesSegmPath);
+				std::reverse(m_curVesSegmPath.begin(), m_curVesSegmPath.end()); // coeded by kjNoh 160922
+				WriteLog(__FILE__, __LINE__, __FUNCTION__);
+				// compute region mask, refine path, and store
+				FinalizeVesselSegment(m_curVesSegmPath);
+				// reinitialize starting point for next vessel segment
+				m_curVesSegmStartPt = m_curVesSegmEndPt;
+				WriteLog(__FILE__, __LINE__, __FUNCTION__);
+			}
+		}
+
+		//2016.12.22_daseul
+		FinishAndSave2File();
+	}
+
+	// ZOOM MODE
+	/*if (m_bZoom)
+	{
+		WriteLog(__FILE__, __LINE__, __FUNCTION__);
+		if (0 <= pt_img.x && pt_img.x < m_rcPic.Width() && 0 <= pt_img.y && pt_img.y < m_rcPic.Height())
+		if (m_iMode_zoomWnd != 1)
+			m_ptZoom = pt_img;
+
+		if (0 <= point.x - m_rcNavi.left && point.x - m_rcNavi.left < m_rcNavi.Width() && 0 <= point.y - m_rcNavi.top && point.y - m_rcNavi.top < m_rcNavi.Height())
+		{
+			WriteLog(__FILE__, __LINE__, __FUNCTION__);
+			if (!m_bMove)
+			{
+				WriteLog(__FILE__, __LINE__, __FUNCTION__);
+				m_iMouseState = ZOOMWND_CLICK_DOWN;
+				m_picZoom.SetFocus();
+
+				m_ptCur_Zoom.x = (point.x - m_rcNavi.left) * m_fZoomRatio;
+				m_ptCur_Zoom.y = (point.y - m_rcNavi.top) * m_fZoomRatio;
+
+				cv::circle(m_cropImg, m_ptCur_Zoom, 1, cv::Scalar(255, 255, 255), 2);
+				//cv::imshow("circle_crop", m_cropImg);
+
+				cv::Point pt;
+				if (m_leftTop.x == 0) {
+					m_fNull_width = m_zoomImg.cols - m_cropImg.cols;
+					pt.x = m_ptCur_Zoom.x - m_fNull_width;
+				}
+				else
+					pt.x = m_ptCur_Zoom.x;
+				if (m_leftTop.y == 0) {
+					m_fNull_height = m_zoomImg.rows - m_cropImg.rows;
+					pt.y = m_ptCur_Zoom.y - m_fNull_height;
+				}
+				else
+					pt.y = m_ptCur_Zoom.y;
+
+				if (m_curVesSegmStartPt == cv::Point(-1, -1))
+				{
+					m_curVesSegmStartPt = pt + m_leftTop;
+					m_curVesSegmEndPt = pt + m_leftTop;
+				}
+				else
+				{
+					m_curVesSegmEndPt = pt + m_leftTop;
+					//PointsOfLine();
+
+					CVesSegm vecPts;
+					vecPts.push_back(CVesSegmPt(m_curVesSegmStartPt));
+					vecPts.push_back(CVesSegmPt(m_curVesSegmEndPt));
+					SegmTree.addSegm(vecPts);
+
+					m_curVesSegmStartPt = m_curVesSegmEndPt;
+					OnPaint();
+				}
+			}
+			else
+				m_vecPtZoom.push_back(m_curVesSegmEndPt);
+		}
+		ZoomProcessing();
+	}*/
+
+	OnPaint();
+	//ZoomProcessing(); // annoated by noh 160928
+
+	CDialogEx::OnLButtonDown(nFlags, point);
 }
 
 
@@ -1296,185 +1375,74 @@ void CLiveVesselDlg::OnMouseMove(UINT nFlags, CPoint point)
 	if (!m_bLoad)
 		return;
 
+	// if no files have been loaded, do nothing
+	if (vecFname.size() == NULL) {
+		WriteLog(__FILE__, __LINE__, __FUNCTION__);
+		return;
+	}
+
+	// set default line/feature selection mode as CLEAR
 	iLineSelected_state = CLEAR_LINE;
 	iFeatSelected_state = CLEAR_FEATURE;
 
 	iLineIndex = -1; // coded by kjNoh 160922
 	selectedFeat = cv::Point(-1, -1);// coded by kjNoh 160922
 
+	// compute image coordinate of current mouse point
+	cv::Point pt_img(std::round((point.x - m_rcPic.left) * m_fRatio),
+					 std::round((point.y - m_rcPic.top) * m_fRatio));
+
 	bool bPaint = false;
-
-	if (0 <= point.x - m_rcPic.left && point.x - m_rcPic.left < m_rcPic.Width() &&
-		0 <= point.y - m_rcPic.top && point.y - m_rcPic.top < m_rcPic.Height())
+	// if image coordinate of mouse point valid
+	if (0 <= pt_img.x && pt_img.x < m_width && 0 <= pt_img.y && pt_img.y < m_height)
 	{
 		WriteLog(__FILE__, __LINE__, __FUNCTION__);
-
-		assert(0 <= point.x - m_rcPic.left && point.x - m_rcPic.left < m_rcPic.Width() &&
-			0 <= point.y - m_rcPic.top && point.y - m_rcPic.top < m_rcPic.Height());
-		//m_Picture.SetFocus();
-
-		//////////////////////////////////////
-		//edited by kjNoh 160922
-		//m_ptCur.x = point.x - m_rcPic.left;
-		//m_ptCur.y = point.y - m_rcPic.top;
-		m_ptCur.x = std::round((point.x - m_rcPic.left)*m_fRatio);
-		m_ptCur.y = std::round((point.y - m_rcPic.top)*m_fRatio);
-		///////////////////////////////////////
-
-		cv::Point find_pt;
-		//if (ptStart == cv::Point(-1, -1) && ptEnd == cv::Point(-1, -1))
-		{
-
-			////////////////////////////////////
-			// annotated ny kjNoh 160922
-			//for (int i = 0; i < SegmTree[iSliderPos].size(); i++)
-			//{
-			//	if (SegmTree[iSliderPos][i].end() != (std::find(SegmTree[iSliderPos][i].begin(), SegmTree[iSliderPos][i].end(), m_ptCur)))
-			//	{
-			//		iLineSelected_state = SELECT_LINE;
-			//		iLineIndex = i;
-			//		find_pt = m_ptCur;
-			//	}
-			//}
-			////////////////////////////////////
-			//////////////////////////////
-			// coded by kjNoh 160922
-			bool findNearFeat = false;
-			if (mouseR_state)
-				int afdf = 0;
-			WriteLog(__FILE__, __LINE__, __FUNCTION__);
-			for (int y = -featSearchRagne; y <= featSearchRagne; y++)
-			{
-				for (int x = -featSearchRagne; x <= featSearchRagne; x++)
-				{
-					if (m_ptCur.y + y >= 0 && m_ptCur.y + y < m_height &&m_ptCur.x + x >= 0 && m_ptCur.x + x < m_width)
-					if (FeatrueImg.at<int>(m_ptCur.y + y, m_ptCur.x + x))
-					{
-						WriteLog(__FILE__, __LINE__, __FUNCTION__);
-						iFeatSelected_state = SELECT_FEATURE;
-						selectedFeat = cv::Point(m_ptCur.x + x, m_ptCur.y + y);
-						findNearFeat = true;
-						break;
-					}
-				}
-				if (findNearFeat)
-					break;
-			}
-			//if (!findNearFeat)
-			//{
-			bool findNearSeg = false;
-			WriteLog(__FILE__, __LINE__, __FUNCTION__);
-			for (int y = -2; y <= 2; y++)
-			{
-				for (int x = -2; x <= 2; x++)
-				{
-					if (m_ptCur.y + y >= 0 && m_ptCur.y + y < m_height &&m_ptCur.x + x >= 0 && m_ptCur.x + x < m_width)
-						/*{
-							for (int i = 0; i < SegLabelImg.cols * SegLabelImg.rows; i++)
-							{
-							if (SegLabelImg.at<int>(m_ptCur.y + y, m_ptCur.x + x) == )
-							}
-							}*/
-					if (SegLabelImg.at<int>(m_ptCur.y + y, m_ptCur.x + x))
-					{
-						WriteLog(__FILE__, __LINE__, __FUNCTION__);
-						iLineSelected_state = SELECT_LINE;
-						iLineIndex = SegLabelImg.at<int>(m_ptCur.y + y, m_ptCur.x + x) - 1;
-						find_pt = m_ptCur + cv::Point(x, y);
-
-						findNearSeg = true;
-						break;
-					}
-				}
-				if (findNearSeg)
-					break; WriteLog(__FILE__, __LINE__, __FUNCTION__);
-			}
-			//}
-			//////////////////////////////
-
-
-			//}
-			//////////////////////////////
-
-			////////////////////////////////////
-			// annotated ny kjNoh 160922
-			//if (m_ptCur.x < (find_pt.x - 5) || m_ptCur.y < (find_pt.y - 5) || (find_pt.x + 5) < m_ptCur.x || (find_pt.y + 5) < m_ptCur.y)
-			//	iLineSelected_state = CLEAR_LINE;
-			///////////////////////////////////
-
-		}
+		// store image point as current point
+		m_ptCur = pt_img;
+		// check if current point is close to feature (end/branching point),
+		// if so, set iFeatSelected_state as SELECT_FEATURE and selectedFeat
+		checkIfPointIsNearFeat(m_ptCur);
+		// check if current point is close to vessel segment 
+		// if so, set iLineSelected_state as SELECT_LINE
+		checkIfPointIsNearLine(m_ptCur);
+		WriteLog(__FILE__, __LINE__, __FUNCTION__);
 		bPaint = true;
-	}
 
-	WriteLog(__FILE__, __LINE__, __FUNCTION__);
-	if (vecFname.size() == NULL)
-		return;
-
-	WriteLog(__FILE__, __LINE__, __FUNCTION__);
-	if (ptStart == cv::Point(-1, -1)) {
-		//edited by kjNoh 160922
-		//m_ptCur.x = point.x - m_rcPic.left;
-		//m_ptCur.y = point.y - m_rcPic.top;
-		m_ptCur.x = std::round((point.x - m_rcPic.left)*m_fRatio);
-		m_ptCur.y = std::round((point.y - m_rcPic.top)*m_fRatio);
-	}
-	else if (ptStart != cv::Point(-1, -1))
-	{
-		//edited by kjNoh 160922
-		//ptEnd.x = point.x - m_rcPic.left;
-		//ptEnd.y = point.y - m_rcPic.top;
-		ptEnd.x = std::round((point.x - m_rcPic.left)*m_fRatio);
-		ptEnd.y = std::round((point.y - m_rcPic.top)*m_fRatio);
-
-		// update fast marching method distance if you move mouse pointer
-		// edited by kjnoh 170202
-		OpenEndedFMM(ptEnd);
-
-		//PointsOfLine();
-	}
-
-	//compute function
-	if (m_ptCur.x >= 0 && m_ptCur.y >= 0 && m_ptCur.x < vesselImg.cols && m_ptCur.y < vesselImg.rows)
-	{
-		assert(0 <= point.x - m_rcPic.left && point.x - m_rcPic.left < m_rcPic.Width() &&
-			0 <= point.y - m_rcPic.top && point.y - m_rcPic.top < m_rcPic.Height());
-		WriteLog(__FILE__, __LINE__, __FUNCTION__);
-		if (mouseL_state&&m_bManualEdit)
+		// if drawing mode has been set by left mouse click, 
+		// compute and show real-time path from starting point
+		if (m_bDrawFMMSegment && m_curVesSegmStartPt != m_ptCur)
+		{
+			m_userPath.push_back(m_ptCur);
+			// update fast marching method distance if you move mouse pointer
+			m_curVesSegmEndPt = m_ptCur;
+			//OpenEndedFMM(m_curVesSegmEndPt);
+			OpenEndedFMMwithUserPath(m_curVesSegmEndPt);
+			fmm.compute_discrete_geodesic(frangiDist, m_ptCur, &m_curVesSegmPath);
+			WriteLog(__FILE__, __LINE__, __FUNCTION__);
+		}
+		else if (m_bManualEdit && m_bDrawManualSegment)
 		{
 			std::vector<cv::Point> pts;
-			//cv::line(pts, m_prePt, m_ptCur, 255, 1);
 			pts = getLine(m_prePt, m_ptCur);
 			for (int i = 0; i < pts.size(); i++)
-			{
-				cur_path.push_back(pts[i]);
-			}
-			//cur_path.push_back(m_ptCur);
+				m_curVesSegmPath.push_back(pts[i]);
+
 			m_prePt = m_ptCur;
 			WriteLog(__FILE__, __LINE__, __FUNCTION__);
 		}
-		else if (ptStart != cv::Point(-1, -1) && ptStart != m_ptCur && !frangiDist.empty())
-		{
-			fmm.compute_discrete_geodesic(frangiDist, m_ptCur, &cur_path);
-			WriteLog(__FILE__, __LINE__, __FUNCTION__);
-		}
 	}
+	WriteLog(__FILE__, __LINE__, __FUNCTION__);
 
-	cv::Point center(std::round((point.x - m_rcPic.left) * m_fRatio), std::round((point.y - m_rcPic.top) * m_fRatio));
-
-	/*if (0 <= center.x && center.x < m_rcPic.Width() && 0 <= center.y && center.y < m_rcPic.Height())
-	{
-	OnPaint();
-	}*/
-
-	if (m_bZoom)
+	// FOR ZOOM MODE - PROBABLY OBSOLETE
+	/*if (m_bZoom)
 	{
 		WriteLog(__FILE__, __LINE__, __FUNCTION__);
 
 		if (!m_zoomImg.empty()) {
-			m_ptCur_Zoom.x = (point.x - m_rcZoom.left) * m_fZoomRatio;
-			m_ptCur_Zoom.y = (point.y - m_rcZoom.top) * m_fZoomRatio;
+			m_ptCur_Zoom.x = (point.x - m_rcNavi.left) * m_fZoomRatio;
+			m_ptCur_Zoom.y = (point.y - m_rcNavi.top) * m_fZoomRatio;
 
-			if (0 <= point.x - m_rcZoom.left && point.x - m_rcZoom.left < m_rcZoom.Width() && 0 <= point.y - m_rcZoom.top && point.y - m_rcZoom.top < m_rcZoom.Height())
+			if (0 <= point.x - m_rcNavi.left && point.x - m_rcNavi.left < m_rcNavi.Width() && 0 <= point.y - m_rcNavi.top && point.y - m_rcNavi.top < m_rcNavi.Height())
 			{
 				cv::Point pt;
 				if (m_leftTop.x == 0) {
@@ -1493,7 +1461,7 @@ void CLiveVesselDlg::OnMouseMove(UINT nFlags, CPoint point)
 				m_picZoom.SetFocus();
 
 				m_ptCur = pt + m_leftTop;
-				ptEnd = pt + m_leftTop;
+				m_curVesSegmEndPt = pt + m_leftTop;
 
 				if (m_bMove)
 				{
@@ -1510,7 +1478,7 @@ void CLiveVesselDlg::OnMouseMove(UINT nFlags, CPoint point)
 		}
 		bPaint = true;
 		WriteLog(__FILE__, __LINE__, __FUNCTION__);
-	}
+	}*/
 	if (bPaint)
 		OnPaint(); 
 	WriteLog(__FILE__, __LINE__, __FUNCTION__);
@@ -1518,144 +1486,63 @@ void CLiveVesselDlg::OnMouseMove(UINT nFlags, CPoint point)
 	CDialogEx::OnMouseMove(nFlags, point);
 }
 
-
+// OnLButtonUp() : function effective only for MANUAL DRAWING MODE
+//	drawing is done while holding the Left Button in MANUAL MODE
+//	when Left Button is released, must finalize manually drawn segment
 void CLiveVesselDlg::OnLButtonUp(UINT nFlags, CPoint point)
 {
 	if (m_iMode_zoomWnd == 2)
 		m_vecPtZoom.clear();
-	else if (mouseL_state&&m_bManualEdit)
+
+	else if (m_bManualEdit && m_bDrawManualSegment)
 	{
-		cv::Point center(std::round((point.x - m_rcPic.left) * m_fRatio), std::round((point.y - m_rcPic.top) * m_fRatio));
-		
-		if (center.x < 0 || center.y < 0 || center.x >= vesselImg.cols || center.y >= vesselImg.rows)
+		// compute image coordinate of current mouse point
+		cv::Point pt_img(std::round((point.x - m_rcPic.left) * m_fRatio),
+						 std::round((point.y - m_rcPic.top) * m_fRatio));
+
+		if (pt_img.x < 0 || pt_img.x >= vesselImg.cols || 
+			pt_img.y < 0 || pt_img.y >= vesselImg.rows)
 			return;
 
 		if (iFeatSelected_state == SELECT_FEATURE)
-			ptEnd = selectedFeat;
+			m_curVesSegmEndPt = selectedFeat;
+		else if (iLineSelected_state == SELECT_LINE)
+			m_curVesSegmEndPt = selectedLinePoint;
 		else
-			ptEnd = center;
+			m_curVesSegmEndPt = pt_img;
 
-		mouseL_state = false;
-
-		if (ptEnd == ptStart)
-		{
-			cur_path.clear();
-			ptStart = cv::Point(-1, -1);
+		if (m_curVesSegmEndPt == m_curVesSegmStartPt) {
+			ClearCurPath();
 			return;
 		}
 
-		std::vector<cv::Point> pts = getLine(m_prePt, ptEnd);
+		std::vector<cv::Point> pts = getLine(m_prePt, m_curVesSegmEndPt);
 		for (int i = 0; i < pts.size(); i++)
 		{
-			cur_path.push_back(pts[i]);
+			m_curVesSegmPath.push_back(pts[i]);
 		}
-		
-		if (cur_path.size() < 4)
+		if (m_curVesSegmPath.size() < 4)
 		{
-			cur_path.clear();
-			ptStart = cv::Point(-1, -1);
+			ClearCurPath();
 			return;
 		}
 
-		CVesSegm vesSegm(cur_path);
-		ComputeVesselRadii(vesSegm, FrangiScale, vesselImgG);
-		MakeRegionMask_VesRadii(vesSegm, m_mask);
-		//MakeRegionMask_NKJ(cur_path, FrangiScale, m_mask);
-		SegmTree.addSegm(vesSegm);
-
-		//////////////////////////
-		//coded by kjNoh 160922 
-		featureInfo cur_spepInfor;
-		cur_spepInfor.sp = ptStart;
-		cur_spepInfor.ep = ptEnd;
-		cur_spepInfor.spType = 0;
-		cur_spepInfor.epType = 0;
-
-		featureTree.addFeat(cur_spepInfor);
-
-		for (int i = 0; i < cur_path.size(); i++)
-			SegLabelImg.at<int>(cur_path[i]) = SegmTree.nSegm;
-		FeatrueImg.at<int>(cur_path[0]) = SegmTree.nSegm;
-		FeatrueImg.at<int>(cur_path.back()) = SegmTree.nSegm;
-
-		cur_path.clear();
-
-		ptStart = cv::Point(-1, -1);
+		FinalizeVesselSegment(m_curVesSegmPath);
+		
+		m_bDrawManualSegment = false;
+		ClearCurPath();
 	}
-	//m_ptZoom = ptEnd;
+	//m_ptZoom = m_curVesSegmEndPt;
 	CDialogEx::OnLButtonUp(nFlags, point);
 }
 
 
 void CLiveVesselDlg::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
 {
-	// TODO: 여기에 메시지 처리기 코드를 추가 및/또는 기본값을 호출합니다.
-	/*if (nChar == VK_SPACE)
-	{
-	ptStart = ptEnd = cv::Point(-1, -1);
-	}*/
 
 	CDialogEx::OnKeyDown(nChar, nRepCnt, nFlags);
 }
 
-
-void CLiveVesselDlg::PointsOfLine()	//Bresenham algorithm
-{
-	int dx = abs(ptEnd.x - ptStart.x);
-	int dy = abs(ptEnd.y - ptStart.y);
-
-	if (dx >= dy)
-	{
-		int p = 2 * (dy - dx);
-		int inc_x, inc_y;
-		int y = ptStart.y;
-
-		if (ptStart.x <= ptEnd.x) inc_x = 1;
-		else inc_x = -1;
-
-		if (ptStart.x <= ptEnd.y) inc_y = 1;
-		else inc_y = -1;
-
-		for (int x = ptStart.x; ptStart.x < ptEnd.x ? (x <= ptEnd.x) : (x >= ptEnd.x); x += inc_x) {
-			if (p >= 0) {
-				p += 2 * (dy - dx);
-				y += inc_y;
-			}
-			else
-				p += 2 * dy;
-
-			vecPoints.push_back(cv::Point(x, y));
-			printf("%d %d\n", x, y);
-		}
-		bivecPointsOfLine.push_back(vecPoints);
-	}
-
-	else
-	{
-		int p = 2 * (dx - dy);
-		int inc_x, inc_y;
-		int x = ptStart.x;
-
-		if (ptStart.x < ptEnd.x) inc_x = 1;
-		else inc_x = -1;
-
-		if (ptStart.y < ptEnd.y) inc_y = 1;
-		else inc_y = -1;
-
-		for (int y = ptStart.y; ptStart.y < ptEnd.y ? (y <= ptEnd.y) : (y >= ptEnd.y); y += inc_y) {
-			if (p >= 0) {
-				p += 2 * (dx - dy);
-				x += inc_x;
-			}
-			else
-				p += 2 * dx;
-
-			vecPoints.push_back(cv::Point(x, y));
-			printf("%d %d\n", x, y);
-		}
-		bivecPointsOfLine.push_back(vecPoints);
-	}
-}
 
 
 void CLiveVesselDlg::OnSetFocus(CWnd* pOldWnd)
@@ -1672,18 +1559,21 @@ void CLiveVesselDlg::OnBnClickedButtonZoom()
 }
 
 
-void CLiveVesselDlg::DrawPictureZoom(cv::Mat disp_zoom)
+void CLiveVesselDlg::DrawNavi2window(cv::Mat disp)
 {
-	CRect rcZoom;
-	m_picZoom.GetClientRect(rcZoom);
+	CRect rc;
+	m_picZoom.GetClientRect(rc);
 
 	cv::Mat view_zoomImg;
-	disp_zoom.copyTo(view_zoomImg);
-	cv::resize(view_zoomImg, view_zoomImg, cv::Size(rcZoom.Width(), rcZoom.Height()));
+	disp.copyTo(view_zoomImg);
+	cv::resize(view_zoomImg, view_zoomImg, cv::Size(rc.Width(), rc.Height()));
 
 	cv::flip(view_zoomImg, view_zoomImg, 0);
 	int nX = view_zoomImg.cols;
 	int nY = view_zoomImg.rows;
+
+	// 2017. 02. 07 - SJKOH - NAVIGATOR
+	cv::cvtColor(view_zoomImg, view_zoomImg, CV_GRAY2RGB);
 
 	BITMAPINFOHEADER bitmaphaeader;
 	bitmaphaeader.biSize = sizeof(BITMAPINFOHEADER);
@@ -1709,8 +1599,8 @@ void CLiveVesselDlg::DrawPictureZoom(cv::Mat disp_zoom)
 void CLiveVesselDlg::ZoomProcessing()
 {
 	WriteLog(__FILE__, __LINE__, __FUNCTION__);
-	float iZoom_width = m_rcZoom.Width();
-	float iZoom_height = m_rcZoom.Height();
+	float iZoom_width = m_rcNavi.Width();
+	float iZoom_height = m_rcNavi.Height();
 
 	float iLeft_width, iLeft_height, iRight_width, iRight_height;
 	iLeft_width = 0;
@@ -1862,6 +1752,7 @@ void CLiveVesselDlg::OnBnClickedButtonVcoFrame()
 
 	// load frames
 	printf("start %dth frame\n", cur_frame);
+	m_ctrlProgress.SetPos(20); //2017.02.17 SJKOH -PROGRESS
 	cv::Mat d_tVesselImg = cv::imread(vecFname[cur_frame], CV_LOAD_IMAGE_GRAYSCALE);
 	cv::Mat d_tp1VesselImg = cv::imread(vecFname[cur_frame + 1], CV_LOAD_IMAGE_GRAYSCALE);
 
@@ -1877,14 +1768,20 @@ void CLiveVesselDlg::OnBnClickedButtonVcoFrame()
 	cVCO vco(d_tVesselImg, d_tVc, d_tp1VesselImg, cur_frame + 1, nX, nY, 
 		m_bPostProc, true, "../result/");
 	vco.VesselCorrespondenceOptimization();
-	std::vector<std::vector < cv::Point >> tp1_2d_ves_pts = vco.getVsegVpts2dArr();
+	std::vector<std::vector < cv::Point >> tp1_2d_ves_pts;
+	if (!m_bPostProc)
+		tp1_2d_ves_pts = vco.getVsegVpts2dArr();
+	else
+		tp1_2d_ves_pts = vco.getVsegVpts2dArr_pp();
 	WriteLog(__FILE__, __LINE__, __FUNCTION__, "END OF VCO");
-
+	m_ctrlProgress.SetPos(40); // 2017.02.07 SJKOH - PRGORESS 
 	// initialize vessel-segmentation tree from vco results
 	SegmTree.newSetTree(tp1_2d_ves_pts);
 	// load pre-computed data - required to compute region mask
 	std::string pre_fn = ChangeFilenameExtension(vecFname[cur_frame + 1], "pre");
 	LoadFrangi(pre_fn);
+	// clear mask
+	m_mask = 0;
 	// compute region mask and refine centerline from vco results
 	for (int j = 0; j < SegmTree.nSegm; j++)
 	{
@@ -1905,6 +1802,8 @@ void CLiveVesselDlg::OnBnClickedButtonVcoFrame()
 
 	// *** save results *** //
 	// save region mask (=m_mask)
+
+	m_ctrlProgress.SetPos(60); //2017.02.07 SJKOH - PROGRESS
 	char maskSavePath[200];
 	std::string cvtFname = vecFname[cur_frame + 1];
 	cvtFname.erase(cvtFname.length() - 4, 4);
@@ -1920,10 +1819,17 @@ void CLiveVesselDlg::OnBnClickedButtonVcoFrame()
 #else
 	std::string vsc_fn = ChangeFilenameExtension(vecFname[cur_frame + 1], "vsc");
 	SaveVesselCenterlinePoints(vsc_fn);
+	m_ctrlProgress.SetPos(80); //2017.02.07 SJKOH - PROGRESS
 #endif
 	// *** end saving results *** //
 
-	iSliderPos = cur_frame + 1;
+	// 2017.02.07 SJKOH - CANCEL
+	ProcessWindowMessage();
+	if (m_bCancel)
+		iSliderPos = cur_frame;
+	else
+		iSliderPos = cur_frame + 1;
+
 	iLineIndex = -1; // coded by kjNoh 160922
 	selectedFeat = cv::Point(-1, -1);// coded by kjNoh 160922
 	iLineSelected_state = CLEAR_LINE;
@@ -1931,8 +1837,9 @@ void CLiveVesselDlg::OnBnClickedButtonVcoFrame()
 
 	updateSegm();
 	dispUpdate(false);
-
+	m_ctrlProgress.SetPos(100); //2017.02.07 SJKOH - PROGRESS
 	printf("VCO_frame done!!\n\n");
+	m_ctrlProgress.SetPos(0); //2017.02.07 SJKOH - PROGRESS
 }
 
 
@@ -2238,35 +2145,6 @@ void CLiveVesselDlg::OnBnClickedButtonVcoSequence()
 	CString aa = L"\\";
 
 	FILE *vscFile;
-	//20161009 _daseul
-	/*vscFile = fopen(m_pszPathName + aa + m_fileName[cur_frame+1] + ".vsc", "wb+");
-	int nCurFrmaeSegm = (int)SegmTree.nSegm;
-	fwrite(&nCurFrmaeSegm, sizeof(int), 1, vscFile);
-
-	for (int j = 0; j < nCurFrmaeSegm; j++)
-	{
-	std::vector<cv::Point> tmp_Segm = SegmTree.get(j);
-	int nCurFrmaeSegmPt = (int)tmp_Segm.size();
-	fwrite(&nCurFrmaeSegmPt, sizeof(int), 1, vscFile);
-
-	for (int k = 0; k < nCurFrmaeSegmPt; k++)
-	{
-	int x = tmp_Segm[k].x;
-	int y = tmp_Segm[k].y;
-	fwrite(&x, sizeof(int), 1, vscFile);
-	fwrite(&y, sizeof(int), 1, vscFile);
-	}
-
-	featureInfo spepInfo = featureTree.get(j);
-	fwrite(&spepInfo.spType, sizeof(int), 1, vscFile);
-	fwrite(&spepInfo.epType, sizeof(int), 1, vscFile);
-
-	tmp_Segm.clear();
-	}
-	fclose(vscFile);*/
-
-
-
 	for (int i = cur_frame; i < end_frame; i++)
 	{
 		printf("start %dth frame\n", i);
@@ -2415,7 +2293,7 @@ void CLiveVesselDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
 		}
 	}
 
-	ptStart = cv::Point(-1, -1);
+	m_curVesSegmStartPt = cv::Point(-1, -1);
 	OnPaint();
 	CDialogEx::OnLButtonDblClk(nFlags, point);
 }
@@ -2442,7 +2320,7 @@ void CLiveVesselDlg::OnRButtonDown(UINT nFlags, CPoint point)
 			WriteLog(__FILE__, __LINE__, __FUNCTION__);
 			dragIdx = i;
 			dragSpEp = 0;
-			ptStart = tmp_feat.ep;
+			m_curVesSegmStartPt = tmp_feat.ep;
 			break;
 		}
 
@@ -2451,7 +2329,7 @@ void CLiveVesselDlg::OnRButtonDown(UINT nFlags, CPoint point)
 			WriteLog(__FILE__, __LINE__, __FUNCTION__);
 			dragIdx = i;
 			dragSpEp = 1;
-			ptStart = tmp_feat.sp;
+			m_curVesSegmStartPt = tmp_feat.sp;
 			break;
 		}
 	}
@@ -2478,7 +2356,7 @@ void CLiveVesselDlg::OnRButtonDown(UINT nFlags, CPoint point)
 	updateSegm();
 
 	WriteLog(__FILE__, __LINE__, __FUNCTION__);
-	OpenEndedFMM(ptEnd);
+	OpenEndedFMM(m_curVesSegmEndPt);
 	WriteLog(__FILE__, __LINE__, __FUNCTION__);
 
 	OnPaint();
@@ -2501,29 +2379,29 @@ void CLiveVesselDlg::OnRButtonUp(UINT nFlags, CPoint point)
 	WriteLog(__FILE__, __LINE__, __FUNCTION__);
 	// edited by kjNoh 160922
 	if (iFeatSelected_state == SELECT_FEATURE)
-		ptEnd = selectedFeat;
+		m_curVesSegmEndPt = selectedFeat;
 	else
-		ptEnd = center;
+		m_curVesSegmEndPt = center;
 	//PointsOfLine();
 
-	fmm.compute_discrete_geodesic(frangiDist, ptEnd, &cur_path);
-	std::reverse(cur_path.begin(), cur_path.end()); // coeded by kjNoh 160922
+	fmm.compute_discrete_geodesic(frangiDist, m_curVesSegmEndPt, &m_curVesSegmPath);
+	std::reverse(m_curVesSegmPath.begin(), m_curVesSegmPath.end()); // coeded by kjNoh 160922
 
 	WriteLog(__FILE__, __LINE__, __FUNCTION__);
 	std::vector<cv::Point> vecPts;
-	//vecPts.push_back(ptStart);
-	for (int i = 0; i < cur_path.size(); i++)
-		vecPts.push_back(cur_path[i]);
-	//vecPts.push_back(ptEnd);
+	//vecPts.push_back(m_curVesSegmStartPt);
+	for (int i = 0; i < m_curVesSegmPath.size(); i++)
+		vecPts.push_back(m_curVesSegmPath[i]);
+	//vecPts.push_back(m_curVesSegmEndPt);
 
 	// coeded by kjNoh 160922
 	if (!dragSpEp)
 	{
 		WriteLog(__FILE__, __LINE__, __FUNCTION__);
 		std::reverse(vecPts.begin(), vecPts.end());
-		cv::Point tmp = ptStart;
-		ptStart = ptEnd;
-		ptEnd = tmp;
+		cv::Point tmp = m_curVesSegmStartPt;
+		m_curVesSegmStartPt = m_curVesSegmEndPt;
+		m_curVesSegmEndPt = tmp;
 	}
 
 	WriteLog(__FILE__, __LINE__, __FUNCTION__);
@@ -2533,8 +2411,8 @@ void CLiveVesselDlg::OnRButtonUp(UINT nFlags, CPoint point)
 	//////////////////////////
 	//coded by kjNoh 160922 
 	featureInfo cur_spepInfor;
-	cur_spepInfor.sp = ptStart;
-	cur_spepInfor.ep = ptEnd;
+	cur_spepInfor.sp = m_curVesSegmStartPt;
+	cur_spepInfor.ep = m_curVesSegmEndPt;
 	if (!dragSpEp)
 	{
 		WriteLog(__FILE__, __LINE__, __FUNCTION__);
@@ -2561,8 +2439,8 @@ void CLiveVesselDlg::OnRButtonUp(UINT nFlags, CPoint point)
 
 	//////////////////////////
 
-	ptStart = cv::Point(-1, -1);
-	ptEnd = cv::Point(-1, -1);
+	m_curVesSegmStartPt = cv::Point(-1, -1);
+	m_curVesSegmEndPt = cv::Point(-1, -1);
 
 	dragIdx = -1;
 	dragSpEp = -1;
@@ -2662,16 +2540,9 @@ void CLiveVesselDlg::OnDestroy()
 
 	CloseLogStream();
 
-	bivecPointsOfLine.clear();
 	vecPoints.clear();
-
-	vecSpEpLists_Zoom.clear();
 	m_vecPtZoom.clear();
-
-	//m_fileName.clear();
 	vecFname.clear();
-
-	//_CrtDumpMemoryLeaks();
 }
 
 void CLiveVesselDlg::dispUpdate(bool bPaint)
@@ -2929,7 +2800,12 @@ void CLiveVesselDlg::OnBnClickedCheckManualEdit()
 	if (iState)
 		m_bManualEdit = true;
 	else
-		m_bManualEdit = false;	
+		m_bManualEdit = false;
+
+	ClearCurPath();
+	m_bDrawManualSegment = false;
+	m_bDrawFMMSegment = false;
+	OnPaint();
 }
 
 std::vector<cv::Point> CLiveVesselDlg::getLine(cv::Point sp, cv::Point ep)
@@ -3067,4 +2943,47 @@ void CLiveVesselDlg::ConvertPerFrameData(CString dir)
 void CLiveVesselDlg::ConstructSeqCSVDataFile(CString dir)
 {
 	   
+}
+
+
+//zoom in&out function using ctrl + mouse wheel
+BOOL CLiveVesselDlg::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+{
+	//2017.01.05_daseul _zoom in&out fuction
+	//if bCtrl is true, start zoom function
+	bWheel = true;
+
+	if (bCtrl)
+	{
+		if (zDelta >= 0)	//up scroll, zoom in
+			m_fZoomRatio += 0.3;
+
+		else				//down scroll, zoom out
+		{
+			m_fZoomRatio -= 0.3;
+			if (m_fZoomRatio < 1)
+				m_fZoomRatio = 1;
+		}
+		OnPaint();
+	}
+
+	return CDialogEx::OnMouseWheel(nFlags, zDelta, pt);
+}
+
+//2017.02.07 - SJKOH - CANCEL BUTTON
+void CLiveVesselDlg::OnBnClickedButtonCancel()
+{
+	// TODO: 여기에 컨트롤 알림 처리기 코드를 추가합니다.
+	m_bCancel = true;
+}
+
+
+//2017.02.07 - SJKOH - PROGRESSWINDOWMESSAGE
+void CLiveVesselDlg::ProcessWindowMessage()
+{
+	MSG msg;
+	while (::PeekMessage(&msg, NULL, NULL, NULL, PM_REMOVE))
+	{
+		::SendMessage(msg.hwnd, msg.message, msg.wParam, msg.lParam);
+	}
 }
