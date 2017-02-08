@@ -36,7 +36,7 @@ void InitLogStream(char *path, bool b_reinit)
 
 	if (b_reinit)
 		log_file << "LOG RE-INITIALIZED" << std::endl;
-	else 
+	else
 		log_file << "LOG INITIALIZED" << std::endl;
 
 	//// open file, write mode
@@ -53,7 +53,7 @@ void WriteLog(char *_file, int _line, char *_ftn, char *log)
 	log_num_lines++;
 	if (log_num_lines > MAX_LOG_NUM_LINES)
 		InitLogStream(log_stream_path);
-	if (_file)	
+	if (_file)
 		log_file << "FILE: " << std::string(_file) << "\t";
 	log_file << "LINE: " << _line;
 	if (_ftn)

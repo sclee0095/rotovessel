@@ -2,19 +2,15 @@
 // LiveVessel.cpp : 응용 프로그램에 대한 클래스 동작을 정의합니다.
 //
 
-//#ifdef _DEBUG
-//#define new DEBUG_NEW
-//#endif
-
-//#ifdef _DEBUG
-//#define DEBUG_NEW new(__FILE__, __LINE__)
-//#define new DEBUG_NEW
-//#endif
 
 #include "stdafx.h"
 #include "LiveVessel.h"
 #include "LiveVesselDlg.h"
 //#include <vld.h> 
+
+#define _CRTDBG_MAP_ALLOC  
+#include <stdlib.h>  
+#include <crtdbg.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW

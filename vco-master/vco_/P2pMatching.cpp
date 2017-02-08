@@ -1,11 +1,24 @@
 
 
 #include "P2pMatching.h"
-
+//#include <vld.h> 
+#if !defined(_AFXDLL)
+#include <windows.h>
+#include <crtdbg.h>
+#if defined(DEBUG) | defined(_DEBUG)
+#if !defined(DEBUG_NEW)
+#define DEBUG_NEW new(_CLIENT_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
+#endif
+#endif
 
 cP2pMatching::cP2pMatching(int size)
 {
-	patchSize = size;	
+
+	patchSize = size;
+	
+	
 	halfPatchSize = patchSize / 2;
 }
 
@@ -32,6 +45,8 @@ void cP2pMatching::run(cv::Mat img_t, cv::Mat img_tp1, cv::Mat gt_bimg_t,
 	std::vector<cv::Point> J,end;
 	std::vector<std::vector<cv::Point>> E;
 	cv::Mat bJ, mapMat;
+	
+
 	MakeGraphFromImage(gt_bimg_t, J, end, bJ, E, mapMat);
 	float *d_tp1 = 0;
 	int numKeyPts;
@@ -80,6 +95,9 @@ void cP2pMatching::run(cv::Mat img_t, cv::Mat img_tp1, cv::Mat gt_bimg_t,
 	d_tp1_img.convertTo(d_tp1_img, CV_32FC1);
 	d_tp1 = ((float*)d_tp1_img.data);
 
+
+
+	
 
 	// junction matching
 	int nJ = J.size();
@@ -138,7 +156,9 @@ void cP2pMatching::run(cv::Mat img_t, cv::Mat img_tp1, cv::Mat gt_bimg_t,
 			if (idx_img_tp1.at<int>(cand_idx.at<cv::Point>(k)) != -1)
 			{
 				//cv::norm()
+
 				//float t = cv::norm(d_t_img.col(0) - d_tp1_img.col(idx_img_tp1.at<unsigned short>(cand_idx.at<cv::Point>(k))));
+
 				dist_img.at<float>(cand_idx.at<cv::Point>(k, 0)) =
 					cv::norm(d_t_img.col(0) - d_tp1_img.col(idx_img_tp1.at<int>(cand_idx.at<cv::Point>(k))), cv::NormTypes::NORM_L2);
 
@@ -521,19 +541,37 @@ void cP2pMatching::run(cv::Mat img_t, cv::Mat img_tp1, cv::Mat gt_bimg_t,
 	//delete[] d_tp1;
 	//delete[] f_tp1;
 }
-
-
-void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J, 
-	std::vector<cv::Point> &o_end, cv::Mat &bJ,
+void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J, std::vector<cv::Point> &o_end, cv::Mat &bJ,
 	std::vector<std::vector<cv::Point>> &E,cv::Mat &mapMat)
 {
+	// INPUT
+	// bimg : binary image of vessel center line
+	//
+	// OUTPUT
+	// J : store only junction points
+	// o_end : store only end points
+	// bJ : record feature point state whether juntuon point
+	// mapMat : record index of connected feature point as each feature points. 
+	// details
+	// 1. detect end & junction points.
+	// 2. devide INPUT image to draw vessel center line to each segment.
+	//  a. check point to connect
+	//  b. extract vessel segment center line to follow each connected state
+	//   - end to end
+	//   - end to junction
+	//   - junction to junction
+
 	// parameter
 	int patch_half_size = 5;
 
+	// set image size
 	int nY = bimg.rows;
 	int nX = bimg.cols;
 
-	//junction & end point detection
+	// junction point detection using matlab code
+	// matlab code
+	// - code to find brach point
+	// - code to find end point
 	cv::Mat copy;
 	bimg.copyTo(copy);
 	cv::Mat C;
@@ -542,7 +580,7 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 	cv::Mat B;
 	backcount4(copy, B);
 	cv::Mat matE = (B == 1);
-
+	
 	cv::Mat FC = C.mul(~matE);
 	cv::Mat D;
 	cv::Mat kernel(3, 3, CV_8UC1);
@@ -555,9 +593,11 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 	cv::Mat M = D&(FC & Vp);
 	cv::Mat branch_img = FC & ~M;
 
-	bool verbe = false;
-	int waitTime = 1;	
+	// for visualization
+	bool verbe = false; // if you want to detail process, you should chage value of verbe to "verbe"
+	int waitTime = 1; // for viewing time.(ms)
 
+	// end point detection using matlab code
 	cv::Mat end_img;
 	endp(bimg, end_img);
 	std::vector<cv::Point> ends;
@@ -567,13 +607,7 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 	cv::Mat dilated_branch_img;
 	cv::dilate(branch_img, dilated_branch_img,kernel);
 	cv::Mat CC;
-	//std::vector<cv::Point> CC;
 	int numCC = cv::connectedComponents(dilated_branch_img,CC,4);
-
-	//cv::Mat CC_8u;
-	//CC.convertTo(CC_8u, CV_8UC1);
-	//cv::imshow("CC", CC_8u*40);
-	//cv::waitKey();
 
 	numCC -= 1;
 
@@ -592,7 +626,6 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 	
 	cv::Mat branch_idx_img;
 	CC.copyTo(branch_idx_img);
-
 	for (int j = 0; j < numCC; j++)
 	{
 		std::vector<cv::Point> tCC = PixelIdxList[j];
@@ -603,35 +636,35 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 		{
 			sumX += tCC[k].x;
 			sumY += tCC[k].y;
+
 			xx.at<unsigned short>(k, 0) = tCC[k].x;
 			yy.at<unsigned short>(k, 0) = tCC[k].y;
+			
 		}
 
 		int cy = round(sumY / (float)tCC.size());
 		int cx = round(sumX / (float)tCC.size());
-		cv::Mat patch = ExtractPatchWithZeroPadding(bimg, cv::Point(cx, cy), 
-			patch_half_size * 2 + 1);
+		cv::Mat patch = ExtractPatchWithZeroPadding(bimg, cv::Point(cx, cy), patch_half_size * 2 + 1);
 
 		cv::Mat DT;
 		cv::Mat CPT;
-
-		/*[DT, CPT] = */
 		cv::distanceTransform(~patch, DT, CPT, CV_DIST_L1, 3, cv::DIST_LABEL_PIXEL);
 
 		std::vector<cv::Point> cptSeed;
-		for (int y = 0; y < DT.rows; y++) {
-			for (int x = 0; x < DT.cols; x++) {
+		for (int y = 0; y < DT.rows; y++)
+		{
+
+			for (int x = 0; x < DT.cols; x++)
+			{
 				if (DT.at<float>(y, x) == 0)
 					cptSeed.push_back(cv::Point(x, y));
-			}	
+			}
+			
 		}
 
 		cv::Point xxyy = cptSeed[CPT.at<int>(patch_half_size + 1, patch_half_size + 1)-1];
 		cv::Point cc = xxyy + cv::Point(cx - patch_half_size - 1, cy - patch_half_size - 1);
-		if (cc.x > 0 && cc.x < bimg.cols - 1 && cc.y > 0 && cc.y < bimg.rows - 1) // ADDED SCLEE 20170127
-			branch[j] = cc;
-		else
-			int a = 0;
+		branch[j] = cc;
 	}
 
 	//idx = find(ismember([end_y, end_x], [branch_y, branch_x], 'rows'));
@@ -639,6 +672,7 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 	bool bExist = false;
 	for (int i = 0; i < ends.size(); i++)
 	{
+
 		for (int j = 0; j < ends.size(); j++)
 		{
 			if (i == j)
@@ -660,6 +694,7 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 	for (int i = 0; i < ends.size(); i++)
 		V.push_back(ends[i]);
 
+
 	int numV = V.size();
 	bJ = cv::Mat::zeros(numV, 1,CV_8UC1); 
 	cv::Rect rc(0,0,1,J.size()); bJ(rc) = true;
@@ -667,7 +702,6 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 	cv::Mat conn = cv::Mat::zeros(numV, numV,CV_8UC1);
 	mapMat = cv::Mat::zeros(numV, numV,CV_32SC1);
 
-	
 	cv::Mat simg;
 	bimg.copyTo(simg);
 	std::vector<cv::Point> all_CC_pts ; // junction CC
@@ -676,9 +710,11 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 		cv::Mat temp = cv::Mat::zeros(nY, nX, CV_8UC1);
 		for (int k = 0; k < PixelIdxList[j].size(); k++)
 		{
+
 			simg.at<uchar>(PixelIdxList[j][k]) = false;
 			temp.at<uchar>(PixelIdxList[j][k]) = 255;
 		}
+		
 		
 		std::vector<cv::Point> idx;
 		cv::findNonZero((bimg==255)&(temp==255), idx);
@@ -691,6 +727,7 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 	int numE = numCC;
 	//E = std::vector<std::vector<cv::Point>>::vector(numE);// annoted by kjNoh 161007
 
+
 	//PixelIdxList.clear();
 	//PixelIdxList.assign(numCC,std::vector<cv::Point>);
 	PixelIdxList = std::vector<std::vector<cv::Point>>();
@@ -700,13 +737,16 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 	for (int j = 1; j < numCC + 1; j++)
 	{
 		cv::Mat cur_label_img = (CC == j);
+
 		std::vector<cv::Point> cur_label;
+
 		cv::findNonZero(cur_label_img, cur_label);
+
 		PixelIdxList.push_back(cur_label);
 	}
 
 	for (int j = 0; j < numCC; j++)
-	{
+	{	
 		std::vector<cv::Point> tCC = PixelIdxList[ j ];
 		cv::Mat timg;
 		bimg.copyTo(timg);
@@ -735,7 +775,7 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 			cv::Point curPt;
 			// forward path
 			while (true)
-			{
+			{				
 				if (bForwardFirst)
 				{
 					curPt = stIDX;
@@ -755,7 +795,7 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 				
 				if (!nextXY.size())
 					break;
-			
+
 				curPt = cv::Point(nextXY[0]);
 				timg.at<uchar>(curPt) = 0;
 
@@ -786,10 +826,13 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 				timg.at<uchar>(curPt) = 0;
 
 				std::vector<cv::Point>::iterator it;
+
 				it = tE.begin();
+
 				tE.insert(it, curPt);
 			}
 
+			
 			for (int k = 0; k < V.size(); k++)
 			{
 				if (V[k] == tE[0])
@@ -801,6 +844,7 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 					edV = k;
 				}
 			}
+
 		}
 		else if (idx.size() == 1) // case: junction - end
 		{
@@ -819,12 +863,16 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 
 			
 			cv::Mat check_img2(512, 512, CV_8UC3);
+			
 			if (verbe)
 			{
+
 				for (int y = 0; y < 512; y++)
 				{
+
 					for (int x = 0; x < 512; x++)
 					{
+
 						if (timg.at<uchar>(y, x) == 1)
 						{
 							check_img2.at<uchar>(y, x * 3 + 0) = 255;
@@ -843,7 +891,10 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 							check_img2.at<uchar>(y, x * 3 + 1) = 0;
 							check_img2.at<uchar>(y, x * 3 + 2) = 0;
 						}
+
+
 					}
+
 				}
 			}
 
@@ -853,6 +904,8 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 
 				std::vector<cv::Point> incXY;
 				cv::findNonZero(temp, incXY);
+
+
 
 				if (verbe)
 				{
@@ -922,16 +975,13 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 					stV = branch_idx;
 					for (int k = 0; k < t_path.size(); k++)
 					{
-						// MODIFIED SCLEE 20170127
-						if (t_path[k].x > 0 && t_path[k].x < bimg.cols &&
-							t_path[k].y > 0 && t_path[k].y < bimg.rows) {
-							timg.at<uchar>(t_path[k]) = 0;
-							std::vector<cv::Point>::iterator it;
-							it = tE.begin();
-							tE.insert(it, t_path[k]);
-						}
-						else
-							int a = 0;
+						timg.at<uchar>(t_path[k]) = 0;
+
+
+						std::vector<cv::Point>::iterator it;
+						it = tE.begin();
+
+						tE.insert(it, t_path[k]);
 					}
 					
 					
@@ -953,6 +1003,8 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 				it = tE.begin();
 
 				tE.insert(it, curXY);
+
+				
 			}
 		}
 		else // case: junction - junction
@@ -967,12 +1019,16 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 			cv::Point curXY;
 
 			cv::Mat check_img2(512, 512, CV_8UC3);
+
 			if (verbe)
 			{
+
 				for (int y = 0; y < 512; y++)
 				{
+
 					for (int x = 0; x < 512; x++)
 					{
+
 						if (timg.at<uchar>(y, x) == 1)
 						{
 							check_img2.at<uchar>(y, x * 3 + 0) = 255;
@@ -991,13 +1047,17 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 							check_img2.at<uchar>(y, x * 3 + 1) = 0;
 							check_img2.at<uchar>(y, x * 3 + 2) = 0;
 						}
+
+
 					}
+
 				}
 			}
 			
 			// forward path
 			while (true)
 			{
+				
 				if (bForwardFirst)
 				{
 					//curY = stY; curX = stX;
@@ -1022,6 +1082,7 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 				std::vector<cv::Point> incXY;
 				std::vector<cv::Point> nextXY;
 				cv::findNonZero(temp, incXY);
+	
 				
 				
 				for (int k = 0; k < incXY.size(); k++)
@@ -1071,19 +1132,28 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 					curXY = nextXY[ii[0]];
 					int branch_idx = branch_idx_img.at<int>(curXY)-1;
 					std::vector<cv::Point> t_path = bresenham(curXY, branch[branch_idx]);
+					
 
 					//tE = [tE; [t_path_y, t_path_x]];	
 					for (int k = 0; k < t_path.size(); k++)
 					{
 						timg.at<uchar>(t_path[k]) = 0;
+
 						tE.push_back(t_path[k]);
+
 					}
+
+					
+
 					break;
 				}
 				//curY = nextY(1); curX = nextX(1);
 				curXY = nextXY[0];
+
 				timg.at<uchar>(curXY) = 0;
+
 				tE.push_back(curXY);
+				
 			}
 			// backward path
 			while (true)
@@ -1111,6 +1181,7 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 				std::vector<cv::Point> incXY;
 				std::vector<cv::Point> nextXY;
 				cv::findNonZero(temp, incXY);
+
 
 
 				for (int k = 0; k < incXY.size(); k++)
@@ -1165,12 +1236,14 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 						std::vector<cv::Point>::iterator it;
 						it = tE.begin();
 
+
 						tE.insert(it,t_path[k]);
 					}
 					//tE = [flipud([t_path_y, t_path_x]); tE];
 					break;
 				}
 				//curY = nextY; curX = nextX;
+
 
 				// coded by kjNoj 161007
 				if (nextXY.empty())
@@ -1179,13 +1252,19 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 					break;
 				}
 
+
 				curXY = nextXY[0];
 				timg.at<uchar>(curXY) = 0;
 				
 
 				std::vector<cv::Point>::iterator it;
+
 				it = tE.begin();
+
 				tE.insert(it,curXY);
+
+
+
 			}
 			//stV = find(ismember(V, tE(1, :), 'rows'));
 			//edV = find(ismember(V, tE(end, :), 'rows'));
@@ -1209,6 +1288,7 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 			continue;
 		}
 
+
 		//E [j]  = tE;
 		E.push_back(tE); //edited by kjNoh 161007
 
@@ -1216,9 +1296,797 @@ void cP2pMatching::MakeGraphFromImage(cv::Mat bimg, std::vector<cv::Point> &J,
 		//mapMat.at<int>(stV, edV) = j+1;
 		mapMat.at<int>(stV, edV) = j + 1 - adjustCnt; // edited by kjNoh 161007
 
-		//if (j == 44)
-		//	int a = 0;
+
+		if (j == 44)
+			int a = 0;
 		tE.clear();
+
+	}
+
+	PixelIdxList.clear();
+	//cv::Mat branch_img = bwmorph(bimg, 'branchpoints');
+	//[branch_y, branch_x] = find(branch_img);
+	//end_img = bwmorph(bimg, 'endpoints');
+	//[end_y, end_x] = find(end_img);
+
+	////added
+	//dilated_branch_img = bwmorph(branch_img, 'dilate');
+	//CC = bwconncomp(dilated_branch_img, 4);
+	//numCC = CC.NumObjects;
+	//branch_y = zeros(numCC, 1);
+	//branch_x = zeros(numCC, 1);
+	//branch_idx_img = zeros(nY, nX);
+}
+
+void cP2pMatching::MakeGraphFromImage2(cv::Mat bimg, std::vector<cv::Point> &J, std::vector<cv::Point> &o_end, cv::Mat &bJ,
+	std::vector<std::vector<cv::Point>> &E, cv::Mat &mapMat)
+{
+	// parameter
+	int patch_half_size = 5;
+
+	int nY = bimg.rows;
+	int nX = bimg.cols;
+
+	//junction & end point detection
+
+	cv::Mat copy;
+	bimg.copyTo(copy);
+	cv::Mat C;
+	branch(copy, C);
+
+	cv::Mat B;
+	backcount4(copy, B);
+	cv::Mat matE = (B == 1);
+
+
+	cv::Mat FC = C.mul(~matE);
+	cv::Mat D;
+	cv::Mat kernel(3, 3, CV_8UC1);
+	cv::Mat Vp = ((B == 2) & ~matE);
+	cv::Mat Vq = ((B > 2) & ~matE);
+
+	kernel = 255;
+	cv::dilate(Vq, D, kernel);
+
+	cv::Mat M = D&(FC & Vp);
+	cv::Mat branch_img = FC & ~M;
+
+	bool verbe = false;
+	int waitTime = 1;
+
+
+
+	cv::Mat end_img;
+	endp(bimg, end_img);
+	std::vector<cv::Point> ends;
+	cv::findNonZero(end_img, ends);
+
+	// added
+	cv::Mat dilated_branch_img;
+	cv::dilate(branch_img, dilated_branch_img, kernel);
+	cv::Mat CC;
+	//std::vector<cv::Point> CC;
+	int numCC = cv::connectedComponents(dilated_branch_img, CC, 4);
+
+	//cv::Mat CC_8u;
+	//CC.convertTo(CC_8u, CV_8UC1);
+	//cv::imshow("CC", CC_8u*40);
+	//cv::waitKey();
+
+	numCC -= 1;
+
+	std::vector<std::vector<cv::Point>> PixelIdxList(numCC);
+	for (int j = 1; j < numCC + 1; j++)
+	{
+		cv::Mat cur_label_img = (CC == j);
+
+		std::vector<cv::Point> cur_label;
+
+		cv::findNonZero(cur_label_img, cur_label);
+
+		PixelIdxList[j - 1] = (cur_label);
+	}
+	std::vector<cv::Point> branch(numCC);
+
+
+	cv::Mat branch_idx_img;
+	CC.copyTo(branch_idx_img);
+
+	for (int j = 0; j < numCC; j++)
+	{
+		std::vector<cv::Point> tCC = PixelIdxList[j];
+		int sumX = 0;
+		int sumY = 0;
+		cv::Mat xx(tCC.size(), 1, CV_16UC1), yy(tCC.size(), 1, CV_16UC1);
+		for (int k = 0; k < tCC.size(); k++)
+		{
+			sumX += tCC[k].x;
+			sumY += tCC[k].y;
+
+			xx.at<unsigned short>(k, 0) = tCC[k].x;
+			yy.at<unsigned short>(k, 0) = tCC[k].y;
+
+		}
+
+		int cy = round(sumY / (float)tCC.size());
+		int cx = round(sumX / (float)tCC.size());
+		cv::Mat patch = ExtractPatchWithZeroPadding(bimg, cv::Point(cx, cy), patch_half_size * 2 + 1);
+
+
+		cv::Mat DT;
+		cv::Mat CPT;
+
+
+		/*[DT, CPT] = */cv::distanceTransform(~patch, DT, CPT, CV_DIST_L1, 3, cv::DIST_LABEL_PIXEL);
+
+		std::vector<cv::Point> cptSeed;
+		for (int y = 0; y < DT.rows; y++)
+		{
+
+			for (int x = 0; x < DT.cols; x++)
+			{
+				if (DT.at<float>(y, x) == 0)
+					cptSeed.push_back(cv::Point(x, y));
+			}
+
+		}
+
+		cv::Point xxyy = cptSeed[CPT.at<int>(patch_half_size + 1, patch_half_size + 1) - 1];
+
+		cv::Point cc = xxyy + cv::Point(cx - patch_half_size - 1, cy - patch_half_size - 1);
+
+
+		branch[j] = cc;
+	}
+
+	//idx = find(ismember([end_y, end_x], [branch_y, branch_x], 'rows'));
+	std::vector<cv::Point> tmpEnds;
+	bool bExist = false;
+	for (int i = 0; i < ends.size(); i++)
+	{
+
+		for (int j = 0; j < ends.size(); j++)
+		{
+			if (i == j)
+				continue;
+
+			if (ends[i] == ends[j])
+				bExist = true;
+		}
+		if (!bExist)
+			tmpEnds.push_back(ends[i]);
+	}
+	ends = tmpEnds;
+
+	J = branch;
+	o_end = ends;
+	std::vector<cv::Point> V;
+	for (int i = 0; i < branch.size(); i++)
+		V.push_back(branch[i]);
+	for (int i = 0; i < ends.size(); i++)
+		V.push_back(ends[i]);
+
+
+	int numV = V.size();
+	bJ = cv::Mat::zeros(numV, 1, CV_8UC1);
+	cv::Rect rc(0, 0, 1, J.size()); bJ(rc) = true;
+
+	cv::Mat conn = cv::Mat::zeros(numV, numV, CV_8UC1);
+	mapMat = cv::Mat::zeros(numV, numV, CV_32SC1);
+
+
+	cv::Mat simg;
+	bimg.copyTo(simg);
+	std::vector<cv::Point> all_CC_pts; // junction CC
+	for (int j = 0; j < numCC; j++)
+	{
+		cv::Mat temp = cv::Mat::zeros(nY, nX, CV_8UC1);
+		for (int k = 0; k < PixelIdxList[j].size(); k++)
+		{
+
+			simg.at<uchar>(PixelIdxList[j][k]) = false;
+			temp.at<uchar>(PixelIdxList[j][k]) = 255;
+		}
+
+
+		std::vector<cv::Point> idx;
+		cv::findNonZero((bimg == 255)&(temp == 255), idx);
+		for (int k = 0; k < idx.size(); k++)
+			all_CC_pts.push_back(idx[k]);
+	}
+
+	numCC = cv::connectedComponents(simg, CC);
+	numCC -= 1;
+	int numE = numCC;
+	//E = std::vector<std::vector<cv::Point>>::vector(numE);// annoted by kjNoh 161007
+
+
+	//PixelIdxList.clear();
+	//PixelIdxList.assign(numCC,std::vector<cv::Point>);
+	PixelIdxList = std::vector<std::vector<cv::Point>>();
+
+	int adjustCnt = 0;
+
+	for (int j = 1; j < numCC + 1; j++)
+	{
+		cv::Mat cur_label_img = (CC == j);
+
+		std::vector<cv::Point> cur_label;
+
+		cv::findNonZero(cur_label_img, cur_label);
+
+		PixelIdxList.push_back(cur_label);
+	}
+
+	for (int j = 0; j < numCC; j++)
+	{
+
+		if (j == 46)
+		{
+			int asdf = 0;
+			waitTime = 0;
+		}
+
+
+		std::vector<cv::Point> tCC = PixelIdxList[j];
+		cv::Mat timg;
+		bimg.copyTo(timg);
+		timg /= 255;
+		for (int k = 0; k < all_CC_pts.size(); k++)
+			timg.at<uchar>(all_CC_pts[k]) = 2;
+		std::vector<cv::Point> tE;
+		std::vector<int> idx;
+		//std::vector<int> stV,edV;
+		int stV = -1, edV = -1;
+		for (int k = 0; k < tCC.size(); k++)
+		{
+			if (end_img.at<uchar>(tCC[k]))
+				idx.push_back(k);
+		}
+
+
+		//int stV = 0; int edV = 0;
+		if (idx.size() == 2) // case: end - end
+		{
+
+			cv::Point stIDX = tCC[0];
+			timg.at<uchar>(stIDX) = 0;
+
+			tE.push_back(stIDX);
+			bool bForwardFirst = true;
+			bool bBackwardFirst = true;
+			cv::Point curPt;
+			// forward path
+			while (true)
+			{
+
+				if (bForwardFirst)
+				{
+					curPt = stIDX;
+					bForwardFirst = false;
+				}
+
+
+				cv::Mat temp = ExtractPatchWithZeroPadding(timg, curPt, 3);
+				std::vector<cv::Point> incXY;
+				cv::findNonZero(temp, incXY);
+
+				std::vector<cv::Point> nextXY;
+				for (int k = 0; k < incXY.size(); k++)
+				{
+					cv::Point tmp = cv::Point(curPt.x + incXY[k].x - 1, curPt.y + incXY[k].y - 1);
+					nextXY.push_back(tmp);
+				}
+
+				if (!nextXY.size())
+					break;
+
+
+				curPt = cv::Point(nextXY[0]);
+				timg.at<uchar>(curPt) = 0;
+
+				tE.push_back(curPt);
+			}
+			// backward path
+			while (true)
+			{
+				if (bBackwardFirst)
+				{
+					curPt = stIDX;
+					bBackwardFirst = false;
+				}
+				cv::Mat temp = ExtractPatchWithZeroPadding(timg, curPt, 3);
+				std::vector<cv::Point> incXY;
+				cv::findNonZero(temp, incXY);
+
+				std::vector<cv::Point> nextXY;
+				for (int k = 0; k < incXY.size(); k++)
+				{
+					cv::Point tmp = cv::Point(curPt.x + incXY[k].x - 1, curPt.y + incXY[k].y - 1);
+					nextXY.push_back(tmp);
+				}
+
+				if (!nextXY.size())
+					break;
+				curPt = cv::Point(nextXY[0]);
+				timg.at<uchar>(curPt) = 0;
+
+				std::vector<cv::Point>::iterator it;
+
+				it = tE.begin();
+
+				tE.insert(it, curPt);
+			}
+
+
+			for (int k = 0; k < V.size(); k++)
+			{
+				if (V[k] == tE[0])
+				{
+					stV = k;
+				}
+				if (V[k] == tE[tE.size() - 1])
+				{
+					edV = k;
+				}
+			}
+
+		}
+		else if (idx.size() == 1) // case: junction - end
+		{
+
+			cv::Point curXY = tCC[idx[0]];
+			timg.at<uchar>(curXY) = 0;
+
+			for (int k = 0; k < V.size(); k++)
+			{
+				if (V[k] == curXY)
+				{
+					edV = k;
+				}
+			}
+			tE.push_back(curXY);
+
+
+			cv::Mat check_img2(512, 512, CV_8UC3);
+
+			if (verbe)
+			{
+
+				for (int y = 0; y < 512; y++)
+				{
+
+					for (int x = 0; x < 512; x++)
+					{
+
+						if (timg.at<uchar>(y, x) == 1)
+						{
+							check_img2.at<uchar>(y, x * 3 + 0) = 255;
+							check_img2.at<uchar>(y, x * 3 + 1) = 255;
+							check_img2.at<uchar>(y, x * 3 + 2) = 255;
+						}
+						else if (timg.at<uchar>(y, x) == 2)
+						{
+							check_img2.at<uchar>(y, x * 3 + 0) = 0;
+							check_img2.at<uchar>(y, x * 3 + 1) = 0;
+							check_img2.at<uchar>(y, x * 3 + 2) = 255;
+						}
+						else
+						{
+							check_img2.at<uchar>(y, x * 3 + 0) = 0;
+							check_img2.at<uchar>(y, x * 3 + 1) = 0;
+							check_img2.at<uchar>(y, x * 3 + 2) = 0;
+						}
+
+
+					}
+
+				}
+			}
+
+			while (true)
+			{
+				cv::Mat temp = ExtractPatchWithZeroPadding(timg, curXY, 3);
+
+				std::vector<cv::Point> incXY;
+				cv::findNonZero(temp, incXY);
+
+
+
+				if (verbe)
+				{
+					check_img2.at<uchar>(curXY.y, curXY.x * 3 + 0) = 0;
+					check_img2.at<uchar>(curXY.y, curXY.x * 3 + 1) = 255;
+					check_img2.at<uchar>(curXY.y, curXY.x * 3 + 2) = 0;
+
+					cv::Mat view;
+					check_img2.copyTo(view);
+					cv::resize(view, view, cv::Size(800, 800));
+					cv::imshow("view", view);
+					cv::waitKey(waitTime);
+				}
+
+				std::vector<cv::Point> nextXY;
+				for (int k = 0; k < incXY.size(); k++)
+				{
+					cv::Point tmp = cv::Point(curXY.x + incXY[k].x - 1, curXY.y + incXY[k].y - 1);
+					nextXY.push_back(tmp);
+				}
+				std::vector<int> ii;
+				for (int k = 0; k < nextXY.size(); k++)
+				{
+					if (timg.at<uchar>(nextXY[k]) == 2)
+						ii.push_back(k);
+				}
+				if (ii.size())
+				{
+					if (ii.size() > 1)
+					{
+						cv::Mat nextXY_img(ii.size(), 2, CV_16UC1);
+						cv::Mat curXY_img(ii.size(), 2, CV_16UC1);
+						std::vector<int> dists;
+						int minDist = INT_MAX;
+						int min_idx = 0;
+						for (int k = 0; k < ii.size(); k++)
+						{
+							nextXY_img.at<unsigned short>(k, 0) = nextXY[ii[k]].x;
+							nextXY_img.at<unsigned short>(k, 1) = nextXY[ii[k]].y;
+
+							curXY_img.at<unsigned short>(k, 0) = curXY.x;
+							curXY_img.at<unsigned short>(k, 1) = curXY.y;
+
+							int cur_dist = std::abs(nextXY[ii[k]].x - curXY.x) + std::abs(nextXY[ii[k]].y - curXY.y);
+							if (minDist > cur_dist)
+							{
+								minDist = cur_dist;
+								min_idx = k;
+							}
+						}
+						//dists = sum(abs(nextXY_img - curXY_img), 2);
+						//[~, min_idx] = min(dists);
+						int tmp_ii = ii[min_idx];
+
+						ii.clear();
+						ii.push_back(tmp_ii);
+
+					}
+					//cv::Point curXY;
+					curXY = cv::Point(nextXY[ii[0]]);
+
+					int branch_idx = branch_idx_img.at<int>(curXY)-1;
+					std::vector<cv::Point> t_path;
+					t_path = bresenham(curXY, branch[branch_idx]);
+					//stV.clear();
+					//stV.push_back(branch_idx);
+					stV = branch_idx;
+					for (int k = 0; k < t_path.size(); k++)
+					{
+						timg.at<uchar>(t_path[k]) = 0;
+
+
+						std::vector<cv::Point>::iterator it;
+						it = tE.begin();
+
+						tE.insert(it, t_path[k]);
+					}
+
+
+					//tE = [flipud([t_path_y, t_path_x]); tE];
+					break;
+				}
+				//curY = nextY; curX = nextX;
+				if (nextXY.empty())
+				{
+					tE.insert(tE.begin(), tE.back());
+					break;
+				}
+				curXY = nextXY[0];
+
+				//for (int k = 0; k < curXY_vec.size(); k++)
+				timg.at<uchar>(curXY) = 0;
+
+				std::vector<cv::Point>::iterator it;
+				it = tE.begin();
+
+				tE.insert(it, curXY);
+
+
+			}
+		}
+		else // case: junction - junction
+		{
+			cv::Point stIDX = tCC[0];
+			timg.at<uchar>(stIDX) = 0;
+
+			tE.push_back(stIDX);
+
+			bool bForwardFirst = true;
+			bool bBackwardFirst = true;
+			cv::Point curXY;
+
+			cv::Mat check_img2(512, 512, CV_8UC3);
+
+			if (verbe)
+			{
+
+				for (int y = 0; y < 512; y++)
+				{
+
+					for (int x = 0; x < 512; x++)
+					{
+
+						if (timg.at<uchar>(y, x) == 1)
+						{
+							check_img2.at<uchar>(y, x * 3 + 0) = 255;
+							check_img2.at<uchar>(y, x * 3 + 1) = 255;
+							check_img2.at<uchar>(y, x * 3 + 2) = 255;
+						}
+						else if (timg.at<uchar>(y, x) == 2)
+						{
+							check_img2.at<uchar>(y, x * 3 + 0) = 0;
+							check_img2.at<uchar>(y, x * 3 + 1) = 0;
+							check_img2.at<uchar>(y, x * 3 + 2) = 255;
+						}
+						else
+						{
+							check_img2.at<uchar>(y, x * 3 + 0) = 0;
+							check_img2.at<uchar>(y, x * 3 + 1) = 0;
+							check_img2.at<uchar>(y, x * 3 + 2) = 0;
+						}
+
+
+					}
+
+				}
+			}
+
+			// forward path
+			while (true)
+			{
+
+				if (bForwardFirst)
+				{
+					//curY = stY; curX = stX;
+					curXY = stIDX;
+					bForwardFirst = false;
+				}
+				if (verbe)
+				{
+					check_img2.at<uchar>(curXY.y, curXY.x * 3 + 0) = 0;
+					check_img2.at<uchar>(curXY.y, curXY.x * 3 + 1) = 255;
+					check_img2.at<uchar>(curXY.y, curXY.x * 3 + 2) = 0;
+
+					cv::Mat view;
+					check_img2.copyTo(view);
+					cv::resize(view, view, cv::Size(800, 800));
+					cv::imshow("view", view);
+					cv::waitKey(waitTime);
+
+				}
+
+				cv::Mat temp = ExtractPatchWithZeroPadding(timg, curXY, 3);
+				std::vector<cv::Point> incXY;
+				std::vector<cv::Point> nextXY;
+				cv::findNonZero(temp, incXY);
+
+
+
+				for (int k = 0; k < incXY.size(); k++)
+				{
+					cv::Point tmp = cv::Point(curXY.x + incXY[k].x - 1, curXY.y + incXY[k].y - 1);
+					nextXY.push_back(tmp);
+				}
+				//nextY = curY + incY - (size(temp, 1) - 1); nextX = curX + incX - (size(temp, 2) - 1);
+				std::vector<int> ii;
+				for (int k = 0; k < nextXY.size(); k++)
+				{
+					if (timg.at<uchar>(nextXY[k]) == 2)
+						ii.push_back(k);
+				}
+				if (ii.size())
+				{
+					if (ii.size() > 1)
+					{
+						cv::Mat nextXY_img(ii.size(), 2, CV_16UC1);
+						cv::Mat curXY_img(ii.size(), 2, CV_16UC1);
+						std::vector<int> dists;
+						int minDist = INT_MAX;
+						int min_idx = 0;
+						for (int k = 0; k < ii.size(); k++)
+						{
+							nextXY_img.at<unsigned short>(k, 0) = nextXY[ii[k]].x;
+							nextXY_img.at<unsigned short>(k, 1) = nextXY[ii[k]].y;
+
+							curXY_img.at<unsigned short>(k, 0) = curXY.x;
+							curXY_img.at<unsigned short>(k, 1) = curXY.y;
+
+							int cur_dist = std::abs(nextXY[ii[k]].x - curXY.x) + std::abs(nextXY[ii[k]].y - curXY.y);
+							if (minDist > cur_dist)
+							{
+								minDist = cur_dist;
+								min_idx = k;
+							}
+						}
+						//dists = sum(abs(nextXY_img - curXY_img), 2);
+						//[~, min_idx] = min(dists);
+						int tmp_ii = ii[min_idx];
+
+						ii.clear();
+						ii.push_back(tmp_ii);
+					}
+					//curY = nextY(ii); curX = nextX(ii);
+					curXY = nextXY[ii[0]];
+					int branch_idx = branch_idx_img.at<int>(curXY)-1;
+					std::vector<cv::Point> t_path = bresenham(curXY, branch[branch_idx]);
+
+
+					//tE = [tE; [t_path_y, t_path_x]];	
+					for (int k = 0; k < t_path.size(); k++)
+					{
+						timg.at<uchar>(t_path[k]) = 0;
+
+						tE.push_back(t_path[k]);
+
+					}
+
+
+
+					break;
+				}
+				//curY = nextY(1); curX = nextX(1);
+				curXY = nextXY[0];
+
+				timg.at<uchar>(curXY) = 0;
+
+				tE.push_back(curXY);
+
+			}
+			// backward path
+			while (true)
+			{
+				if (bBackwardFirst)
+				{
+					//curY = stY; curX = stX;
+					curXY = stIDX;
+					bBackwardFirst = false;
+				}
+				if (verbe)
+				{
+					check_img2.at<uchar>(curXY.y, curXY.x * 3 + 0) = 0;
+					check_img2.at<uchar>(curXY.y, curXY.x * 3 + 1) = 255;
+					check_img2.at<uchar>(curXY.y, curXY.x * 3 + 2) = 0;
+
+					cv::Mat view;
+					check_img2.copyTo(view);
+					cv::resize(view, view, cv::Size(800, 800));
+					cv::imshow("view", view);
+					cv::waitKey(waitTime);
+				}
+
+				cv::Mat temp = ExtractPatchWithZeroPadding(timg, curXY, 3);
+				std::vector<cv::Point> incXY;
+				std::vector<cv::Point> nextXY;
+				cv::findNonZero(temp, incXY);
+
+
+
+				for (int k = 0; k < incXY.size(); k++)
+				{
+					cv::Point tmp = cv::Point(curXY.x + incXY[k].x - 1, curXY.y + incXY[k].y - 1);
+					nextXY.push_back(tmp);
+				}
+				std::vector<int> ii;
+				for (int k = 0; k < nextXY.size(); k++)
+				{
+					if (timg.at<uchar>(nextXY[k]) == 2)
+						ii.push_back(k);
+				}
+				if (ii.size())
+				{
+					if (ii.size() > 1)
+					{
+						cv::Mat nextXY_img(ii.size(), 2, CV_16UC1);
+						cv::Mat curXY_img(ii.size(), 2, CV_16UC1);
+						std::vector<int> dists;
+						int minDist = INT_MAX;
+						int min_idx = 0;
+						for (int k = 0; k < ii.size(); k++)
+						{
+							nextXY_img.at<unsigned short>(k, 0) = nextXY[ii[k]].x;
+							nextXY_img.at<unsigned short>(k, 1) = nextXY[ii[k]].y;
+
+							curXY_img.at<unsigned short>(k, 0) = curXY.x;
+							curXY_img.at<unsigned short>(k, 1) = curXY.y;
+
+							int cur_dist = std::abs(nextXY[ii[k]].x - curXY.x) + std::abs(nextXY[ii[k]].y - curXY.y);
+							if (minDist > cur_dist)
+							{
+								minDist = cur_dist;
+								min_idx = k;
+							}
+						}
+						int tmp_ii = ii[min_idx];
+
+						ii.clear();
+						ii.push_back(tmp_ii);
+					}
+					/*curY = nextY(ii); curX = nextX(ii);*/
+					curXY = nextXY[ii[0]];
+					int branch_idx = branch_idx_img.at<int>(curXY)-1;
+					std::vector<cv::Point> t_path;
+					t_path = bresenham(curXY, branch[branch_idx]);
+					for (int k = 0; k < t_path.size(); k++)
+					{
+						timg.at<uchar>(t_path[k]) = 0;
+
+						std::vector<cv::Point>::iterator it;
+						it = tE.begin();
+
+
+						tE.insert(it, t_path[k]);
+					}
+					//tE = [flipud([t_path_y, t_path_x]); tE];
+					break;
+				}
+				//curY = nextY; curX = nextX;
+
+
+				// coded by kjNoj 161007
+				if (nextXY.empty())
+				{
+					tE.insert(tE.begin(), tE.back());
+					break;
+				}
+
+
+				curXY = nextXY[0];
+				timg.at<uchar>(curXY) = 0;
+
+
+				std::vector<cv::Point>::iterator it;
+
+				it = tE.begin();
+
+				tE.insert(it, curXY);
+
+
+
+			}
+			//stV = find(ismember(V, tE(1, :), 'rows'));
+			//edV = find(ismember(V, tE(end, :), 'rows'));
+			for (int k = 0; k < V.size(); k++)
+			{
+				if (V[k] == tE[0])
+				{
+					stV = k;
+				}
+				if (V[k] == tE[tE.size() - 1])
+				{
+					edV = k;
+				}
+			}
+		}
+
+		// coede by kjNoh 161007
+		if (tE.front() == tE.back())
+		{
+			adjustCnt++;
+			continue;
+		}
+
+
+		//E [j]  = tE;
+		E.push_back(tE); //edited by kjNoh 161007
+
+		conn.at<uchar>(stV, edV) = true; conn.at<uchar>(edV, stV) = true;
+		//mapMat.at<int>(stV, edV) = j+1;
+		mapMat.at<int>(stV, edV) = j + 1 - adjustCnt; // edited by kjNoh 161007
+
+
+		if (j == 44)
+			int a = 0;
+		tE.clear();
+
 	}
 
 	PixelIdxList.clear();
@@ -1391,14 +2259,16 @@ void cP2pMatching::backcount4(cv::Mat &src, cv::Mat &dst)
 	dst = src.clone();
 	// ¬±¬â¬Ö¬à¬Ò¬â¬Ñ¬Ù¬å¬Ö¬Þ ¬Ó ¬á¬à¬ã¬Ý¬Ö¬Õ¬à¬Ó¬Ñ¬ä¬Ö¬Ý¬î¬ß¬à¬Þ¬ä¬î 0 ¬Ú 1.
 	cv::threshold(dst, dst, 0, 1, cv::THRESH_BINARY);
+
 	applylut_backcount4(dst, dst);
+
 	// ¬¹¬ä¬à¬Ò¬í ¬Ò¬í¬Ý¬à ¬Ó¬Ú¬Õ¬ß¬à ¬ß¬Ñ ¬ï¬Ü¬â¬Ñ¬ß¬Ö
 	//dst = dst * 255;
 }
 
 void cP2pMatching::applylut_branch(cv::Mat &src, cv::Mat &dst)
 {
-	static int lut_branchpoints[] = { 0, 0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	0,	0,	0,	1,	0,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	0,	1,	1,	1,	0,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	0,	1,	1,	1,	0,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	0,	1,	1,	1,	0,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	0,	1,	1,	1,	0,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1 };
+	static int lut_branchpoints[] = { 0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	0,	0,	0,	1,	0,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	0,	1,	1,	1,	0,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	0,	1,	1,	1,	0,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	0,	1,	1,	1,	0,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	0,	1,	1,	1,	0,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1,	1 };
 
 	cv::Mat k(3, 3, CV_16UC1);
 
@@ -1422,6 +2292,7 @@ void cP2pMatching::applylut_branch(cv::Mat &src, cv::Mat &dst)
 			dst.at<unsigned short>(i, j) = lut_branchpoints[dst.at<unsigned short>(i, j)];
 		}
 	}
+
 	dst.convertTo(dst, CV_8UC1);
 }
 
@@ -1464,15 +2335,24 @@ void cP2pMatching::thin(cv::Mat &src, cv::Mat &dst)
 	dst.copyTo(old);
 	
 	while (true)
+	//for (int i = 0; i < 20; i++)
 	{
 		applylut_thin1(dst, dst);
 		applylut_thin2(dst, dst);
 		std::vector<cv::Point> idx;
+		//cv::Scalar a = cv::sum(~(old & dst));
+		
 		cv::findNonZero( (old != dst), idx);
 		if (!idx.size())
 			break;
 		
+		//cv::imshow("(old & dst)==1", (old != dst)*255);
+		//cv::imshow("dst", dst*255);
+		//cv::imshow("old", old*255);
+		//cv::waitKey();
+
 		dst.copyTo(old);
+
 	}
 
 	// ¬¹¬ä¬à¬Ò¬í ¬Ò¬í¬Ý¬à ¬Ó¬Ú¬Õ¬ß¬à ¬ß¬Ñ ¬ï¬Ü¬â¬Ñ¬ß¬Ö
